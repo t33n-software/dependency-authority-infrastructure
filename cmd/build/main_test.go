@@ -370,7 +370,9 @@ func TestRunSuccessExecutesEveryGate(t *testing.T) {
 		t.Fatalf("run() = %d, want 0; stderr = %q", code, stderr.String())
 	}
 	joined := strings.Join(executed, "\n")
-	const tofuRootEnvironmentPrefix = "OPENTOFU_ENFORCE_GPG_VALIDATION=true,TF_IN_AUTOMATION=true,TF_INPUT=false,TF_PLUGIN_CACHE_DIR=C:\\repo\\.build\\tofu-plugin-cache"
+	// The production code builds the cache path with filepath.Join, so the path
+	// separator follows the host platform; derive the expectation the same way.
+	tofuRootEnvironmentPrefix := "OPENTOFU_ENFORCE_GPG_VALIDATION=true,TF_IN_AUTOMATION=true,TF_INPUT=false,TF_PLUGIN_CACHE_DIR=" + filepath.Join("C:\\repo", tofuPluginCacheDirectory)
 	for _, required := range []string{
 		"go mod verify",
 		"go mod tidy -diff",
