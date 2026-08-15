@@ -110,6 +110,7 @@ func TestRulesetsCoverOnlyEstablishedBranchFamilies(t *testing.T) {
 	}
 	sort.Strings(jsonNames)
 	wantNames := []string{
+		"00-push-protections.json",
 		"01-ticket-working-branches.json",
 		"02-develop.json",
 		"03-main.json",
@@ -138,6 +139,48 @@ func TestRulesetsCoverOnlyEstablishedBranchFamilies(t *testing.T) {
 	} {
 		if !strings.Contains(readme, required) {
 			t.Fatalf("Ruleset README does not contain %q", required)
+		}
+	}
+}
+
+func TestPushProtectionsRulesetBlocksCredentialShapedArtifacts(t *testing.T) {
+	push := readRepositoryFile(t, filepath.Join("docs", "hosting-platforms", "github", "rulesets", "00-push-protections.json"))
+	for _, required := range []string{
+		"\"name\": \"push-protections: block secret and key shaped artifacts\"",
+		"\"target\": \"push\"",
+		"\"source\": \"t33n-software/dependency-authority-infrastructure\"",
+		"\"enforcement\": \"active\"",
+		"\"conditions\": null",
+		"\"bypass_actors\": []",
+		"file_extension_restriction",
+		"restricted_file_extensions",
+		"file_path_restriction",
+		"restricted_file_paths",
+	} {
+		if !strings.Contains(push, required) {
+			t.Fatalf("00-push-protections.json does not contain %q", required)
+		}
+	}
+	for _, extension := range []string{"pem", "key", "p12", "pfx", "jks", "keystore", "kdbx", "ppk", "gpg"} {
+		if !strings.Contains(push, "\"*."+extension+"\"") {
+			t.Fatalf("00-push-protections.json does not restrict the %q extension in glob form", extension)
+		}
+	}
+	for _, path := range []string{"**/.env", "**/.env.*", "**/credentials", "**/credentials.*", "**/*.tfstate", "**/*.tfstate.*"} {
+		if !strings.Contains(push, "\""+path+"\"") {
+			t.Fatalf("00-push-protections.json does not restrict the %q path", path)
+		}
+	}
+	for _, forbidden := range []string{"ref_name", "required_status_checks", "code_scanning", "code_quality", "code_coverage"} {
+		if strings.Contains(push, forbidden) {
+			t.Fatalf("00-push-protections.json unexpectedly contains %q; a push ruleset has no branch targets or check bindings", forbidden)
+		}
+	}
+
+	readme := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "hosting-platforms", "github", "rulesets", "README.md")))
+	for _, required := range []string{"00-push-protections.json", "fork network", "Team plan", "public"} {
+		if !strings.Contains(readme, required) {
+			t.Fatalf("Ruleset README does not document the push protections token %q", required)
 		}
 	}
 }
@@ -221,6 +264,7 @@ func TestModuleAndStackLayoutIsComplete(t *testing.T) {
 func TestCoreContainsNoConcreteBindings(t *testing.T) {
 	forbiddenContent := []string{
 		"cybert33n",
+		"t33n-software",
 		"git-governance",
 		"europe-west3",
 		"937088974261",
@@ -229,7 +273,26 @@ func TestCoreContainsNoConcreteBindings(t *testing.T) {
 		"346339887743",
 		"01c36d",
 	}
+	// Self-references are not concrete bindings: the push Ruleset source field
+	// carries the repository's own identity because the GitHub import format
+	// requires it, and TRACEABILITY.md records this repository's own migration
+	// decisions.
+	selfReferenceExempt := []string{
+		"docs/hosting-platforms/github/rulesets/00-push-protections.json",
+		"docs/TRACEABILITY.md",
+	}
 	for _, path := range repositoryFiles(t, []string{".tf", ".yml", ".yaml", ".json", ".md"}) {
+		slashed := filepath.ToSlash(path)
+		exempt := false
+		for _, exemptPath := range selfReferenceExempt {
+			if strings.HasSuffix(slashed, exemptPath) {
+				exempt = true
+				break
+			}
+		}
+		if exempt {
+			continue
+		}
 		content, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("ReadFile(%q) error = %v", path, err)
@@ -290,7 +353,7 @@ func TestOpenTofuPinsAreExactAndConsistent(t *testing.T) {
 func TestModuleIdentityAndQualityContract(t *testing.T) {
 	goMod := readRepositoryFile(t, "go.mod")
 	for _, required := range []string{
-		"module github.com/CyberT33N/dependency-authority-infrastructure",
+		"module github.com/t33n-software/dependency-authority-infrastructure",
 		"go 1.26",
 		"toolchain go1.26.5",
 	} {
