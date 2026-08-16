@@ -160,6 +160,26 @@ func sourceQualitySteps() []step {
 			arguments:  []string{"mod", "tidy", "-diff"},
 		},
 		{
+			name:       "download build tool dependencies",
+			executable: "go",
+			arguments:  []string{"-C", "tools", "mod", "download"},
+		},
+		{
+			name:       "verify build tool dependencies",
+			executable: "go",
+			arguments:  []string{"-C", "tools", "mod", "verify"},
+		},
+		{
+			name:       "verify build tool metadata",
+			executable: "go",
+			arguments:  []string{"-C", "tools", "mod", "tidy", "-diff"},
+		},
+		{
+			name:       "run lint",
+			executable: "go",
+			arguments:  []string{"tool", "-modfile", "tools/go.mod", "staticcheck", "./..."},
+		},
+		{
 			name:       "run unit tests",
 			executable: "go",
 			arguments:  []string{"test", "-mod=readonly", "./..."},
@@ -178,6 +198,16 @@ func sourceQualitySteps() []step {
 			name:       "run static analysis",
 			executable: "go",
 			arguments:  []string{"vet", "./..."},
+		},
+		{
+			name:       "run vulnerability analysis",
+			executable: "go",
+			arguments:  []string{"tool", "-modfile", "tools/go.mod", "govulncheck", "./..."},
+		},
+		{
+			name:       "validate Lefthook configuration",
+			executable: "go",
+			arguments:  []string{"tool", "-modfile", "tools/go.mod", "lefthook", "validate"},
 		},
 	}
 }

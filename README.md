@@ -46,10 +46,16 @@ go run -mod=readonly ./cmd/build
 ```
 
 Every executable Go package must reach exactly 100.0% statement coverage.
-`cmd/build` additionally enforces the OpenTofu gates: engine version
-verification, recursive format check, and `init` plus `validate` for every
-module, the policy bindings and every reference stack with enforced provider
-GPG validation.
+`cmd/build` additionally enforces lint (staticcheck), fail-closed
+vulnerability analysis (govulncheck), Lefthook configuration validation, and
+the OpenTofu gates: engine version verification, recursive format check, and
+`init` plus `validate` for every module, the policy bindings and every
+reference stack with enforced provider GPG validation.
+
+The Go toolchain is pinned exactly (`toolchain go1.26.6`,
+`GOTOOLCHAIN=local`); no lane downloads a toolchain at build time. Build tools
+live in the pinned `tools/` module. CI re-runs the full gate daily so newly
+disclosed vulnerabilities fail closed even without source changes.
 
 ## Repository layout
 
