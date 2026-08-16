@@ -124,11 +124,15 @@ func TestRunRejectsArguments(t *testing.T) {
 
 func TestRunWithNilContextUsesBackground(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := run(nil, nil, &stdout, &stderr,
+	code := run(testNilContext(), nil, &stdout, &stderr,
 		fakeRunnerOK(), fakeFinderOK(nil), fakeHclRootsOK([]string{"modules/example"}), fakeReaderOK(), fakeFormatterIdentity(), fakeCreatorOK(), fakeCurrentDirectoryOK(), fakeLocatorOK())
 	if code != 0 {
 		t.Fatalf("run() = %d, want 0; stderr = %q", code, stderr.String())
 	}
+}
+
+func testNilContext() context.Context {
+	return nil
 }
 
 func TestRunStopsWhenFormattingFails(t *testing.T) {
@@ -376,10 +380,16 @@ func TestRunSuccessExecutesEveryGate(t *testing.T) {
 	for _, required := range []string{
 		"go mod verify",
 		"go mod tidy -diff",
+		"go -C tools mod download",
+		"go -C tools mod verify",
+		"go -C tools mod tidy -diff",
+		"go tool -modfile tools/go.mod staticcheck ./...",
 		"go test -mod=readonly ./...",
 		"go run -mod=readonly ./cmd/check-coverage",
 		"go test -mod=readonly -race ./...",
 		"go vet ./...",
+		"go tool -modfile tools/go.mod govulncheck ./...",
+		"go tool -modfile tools/go.mod lefthook validate",
 		"tofu version",
 		"tofu fmt -check -recursive",
 		"modules/example|" + tofuRootEnvironmentPrefix + "|tofu init -backend=false -input=false -no-color",
@@ -406,10 +416,65 @@ func TestRunSuccessExecutesEveryGate(t *testing.T) {
 	}
 }
 
+func TestRunSuccessOrdersSecurityGatesBeforeTofuAndBuild(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	executed := make([]string, 0)
+	recorder := func(_ context.Context, environment []string, directory string, executable string, arguments ...string) ([]byte, error) {
+		call := executable + " " + strings.Join(arguments, " ")
+		executed = append(executed, directory+"|"+strings.Join(environment, ",")+"|"+call)
+		if call == "tofu version" {
+			return []byte(validTofuVersionOutput), nil
+		}
+		return nil, nil
+	}
+	code := run(context.Background(), nil, &stdout, &stderr,
+		recorder, fakeFinderOK(nil), fakeHclRootsOK([]string{"modules/example"}), fakeReaderOK(), fakeFormatterIdentity(), fakeCreatorOK(), fakeCurrentDirectoryOK(), fakeLocatorOK())
+	if code != 0 {
+		t.Fatalf("run() = %d, want 0; stderr = %q", code, stderr.String())
+	}
+
+	orderedSteps := []string{
+		"go mod verify",
+		"go mod tidy -diff",
+		"go -C tools mod download",
+		"go -C tools mod verify",
+		"go -C tools mod tidy -diff",
+		"go tool -modfile tools/go.mod staticcheck ./...",
+		"go test -mod=readonly ./...",
+		"go run -mod=readonly ./cmd/check-coverage",
+		"go test -mod=readonly -race ./...",
+		"go vet ./...",
+		"go tool -modfile tools/go.mod govulncheck ./...",
+		"go tool -modfile tools/go.mod lefthook validate",
+		"tofu version",
+		"tofu fmt -check -recursive",
+		"tofu init -backend=false -input=false -no-color",
+		"tofu validate -no-color",
+		"go build -mod=readonly -trimpath -o " + linuxBuildDirectory + "/build ./cmd/build",
+	}
+	previous := -1
+	for _, expected := range orderedSteps {
+		index := -1
+		for position, call := range executed {
+			if strings.Contains(call, expected) {
+				index = position
+				break
+			}
+		}
+		if index < 0 {
+			t.Fatalf("executed steps do not contain %q:\n%s", expected, strings.Join(executed, "\n"))
+		}
+		if index < previous {
+			t.Fatalf("step %q executed at position %d, after position %d; want increasing order", expected, index, previous)
+		}
+		previous = index
+	}
+}
+
 func TestSourceQualitySteps(t *testing.T) {
 	steps := sourceQualitySteps()
-	if len(steps) != 6 {
-		t.Fatalf("sourceQualitySteps() = %d steps, want 6", len(steps))
+	if len(steps) != 12 {
+		t.Fatalf("sourceQualitySteps() = %d steps, want 12", len(steps))
 	}
 	joined := make([]string, 0, len(steps))
 	for _, step := range steps {
@@ -418,10 +483,16 @@ func TestSourceQualitySteps(t *testing.T) {
 	for _, required := range []string{
 		"go mod verify",
 		"go mod tidy -diff",
+		"go -C tools mod download",
+		"go -C tools mod verify",
+		"go -C tools mod tidy -diff",
+		"go tool -modfile tools/go.mod staticcheck ./...",
 		"go test -mod=readonly ./...",
 		"go run -mod=readonly ./cmd/check-coverage",
 		"go test -mod=readonly -race ./...",
 		"go vet ./...",
+		"go tool -modfile tools/go.mod govulncheck ./...",
+		"go tool -modfile tools/go.mod lefthook validate",
 	} {
 		if !strings.Contains(strings.Join(joined, "\n"), required) {
 			t.Fatalf("sourceQualitySteps() does not contain %q", required)
