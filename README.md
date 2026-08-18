@@ -64,12 +64,13 @@ disclosed vulnerabilities fail closed even without source changes.
 - `stacks/` contains the five trust-zone reference stacks.
 - `cmd/` contains the build and coverage gates.
 - `internal/packaging/` contains the same-package workflow contract tests.
-- `docs/` contains architecture, conventions, development, and GitHub
-  Ruleset documentation.
+- `docs/` contains architecture, conventions, and development
+  documentation.
 
 ## Governance
 
 Governed changes land through ticket branches and pull requests into
-`develop`. `main` is the production and control-plane truth. See
-`docs/hosting-platforms/github/rulesets/` for the importable shared-line
-Rulesets and their import timing.
+`develop`. `main` is the production and control-plane truth. Branch
+governance is bound through the organization-level rule-sets; see
+`docs/conventions/hosting-plattform/github/rule-sets/` for the canonical
+source and the rule-set family of this repository.
