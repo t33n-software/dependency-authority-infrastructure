@@ -14,20 +14,14 @@ import (
 	"strings"
 )
 
-const (
-	linuxBuildDirectory      = ".build/bin"
-	tofuPluginCacheDirectory = ".build/tofu-plugin-cache"
-	requiredOpenTofuVersion  = "1.12.5"
-)
+const linuxBuildDirectory = ".build/bin"
 
 // gatePackages lists the Go gate binaries the Linux/AMD64 gate builds.
 var gatePackages = []string{"build", "check-coverage"}
 
-type commandRunner func(context.Context, []string, string, string, ...string) ([]byte, error)
+type commandRunner func(context.Context, []string, string, ...string) ([]byte, error)
 
 type goFileFinder func(string) ([]string, error)
-
-type hclRootFinder func(string) ([]string, error)
 
 type sourceReader func(string) ([]byte, error)
 
@@ -35,14 +29,9 @@ type sourceFormatter func([]byte) ([]byte, error)
 
 type directoryCreator func(string, os.FileMode) error
 
-type workingDirectoryGetter func() (string, error)
-
-type executableLocator func(string) (string, error)
-
 type step struct {
 	name        string
 	environment []string
-	directory   string
 	executable  string
 	arguments   []string
 }
@@ -52,12 +41,10 @@ var (
 	commandArgs        = os.Args
 	runExternalCommand = runCommand
 	findGoFiles        = goFiles
-	findHclRoots       = hclRoots
 	readSource         = os.ReadFile
 	formatSource       = format.Source
 	createDirectory    = os.MkdirAll
-	currentDirectory   = os.Getwd
-	locateExecutable   = exec.LookPath
+	version            = "devel"
 )
 
 func main() {
@@ -68,12 +55,9 @@ func main() {
 		os.Stderr,
 		runExternalCommand,
 		findGoFiles,
-		findHclRoots,
 		readSource,
 		formatSource,
 		createDirectory,
-		currentDirectory,
-		locateExecutable,
 	))
 }
 
@@ -84,13 +68,14 @@ func run(
 	stderr io.Writer,
 	execute commandRunner,
 	locateGoFiles goFileFinder,
-	locateHclRoots hclRootFinder,
 	read sourceReader,
 	format sourceFormatter,
 	makeDirectory directoryCreator,
-	currentDir workingDirectoryGetter,
-	locate executableLocator,
 ) int {
+	if len(arguments) == 1 && arguments[0] == "--version" {
+		fmt.Fprintf(stdout, "build %s\n", version)
+		return 0
+	}
 	if len(arguments) != 0 {
 		fmt.Fprintln(stderr, "usage: build")
 		return 2
@@ -102,37 +87,6 @@ func run(
 		return 1
 	}
 	if !runSteps(ctx, sourceQualitySteps(), stdout, stderr, execute) {
-		return 1
-	}
-	if _, err := locate("tofu"); err != nil {
-		fmt.Fprintln(stderr, "locate tofu executable:", err)
-		return 1
-	}
-	if !verifyOpenTofuVersion(ctx, stdout, stderr, execute) {
-		return 1
-	}
-	if !runSteps(ctx, []step{tofuFormatStep()}, stdout, stderr, execute) {
-		return 1
-	}
-	roots, err := locateHclRoots(".")
-	if err != nil {
-		fmt.Fprintln(stderr, "list OpenTofu roots:", err)
-		return 1
-	}
-	if len(roots) == 0 {
-		fmt.Fprintln(stderr, "no OpenTofu roots found")
-		return 1
-	}
-	if err := makeDirectory(tofuPluginCacheDirectory, 0o755); err != nil {
-		fmt.Fprintln(stderr, "create tofu plugin cache directory:", err)
-		return 1
-	}
-	workingDirectory, err := currentDir()
-	if err != nil {
-		fmt.Fprintln(stderr, "resolve working directory:", err)
-		return 1
-	}
-	if !runSteps(ctx, tofuRootSteps(roots, filepath.Join(workingDirectory, tofuPluginCacheDirectory)), stdout, stderr, execute) {
 		return 1
 	}
 	if err := makeDirectory(linuxBuildDirectory, 0o755); err != nil {
@@ -212,67 +166,6 @@ func sourceQualitySteps() []step {
 	}
 }
 
-func tofuFormatStep() step {
-	return step{
-		name:        "check OpenTofu formatting",
-		environment: tofuEnvironment(),
-		directory:   ".",
-		executable:  "tofu",
-		arguments:   []string{"fmt", "-check", "-recursive"},
-	}
-}
-
-func tofuRootSteps(roots []string, cacheDirectory string) []step {
-	steps := make([]step, 0, len(roots)*2)
-	for _, root := range roots {
-		steps = append(steps,
-			step{
-				name:        "init OpenTofu root " + root,
-				environment: tofuRootEnvironment(cacheDirectory),
-				directory:   root,
-				executable:  "tofu",
-				arguments:   []string{"init", "-backend=false", "-input=false", "-no-color"},
-			},
-			step{
-				name:        "validate OpenTofu root " + root,
-				environment: tofuRootEnvironment(cacheDirectory),
-				directory:   root,
-				executable:  "tofu",
-				arguments:   []string{"validate", "-no-color"},
-			},
-		)
-	}
-	return steps
-}
-
-func tofuEnvironment() []string {
-	return []string{
-		"OPENTOFU_ENFORCE_GPG_VALIDATION=true",
-		"TF_IN_AUTOMATION=true",
-		"TF_INPUT=false",
-	}
-}
-
-func tofuRootEnvironment(cacheDirectory string) []string {
-	return append(tofuEnvironment(), "TF_PLUGIN_CACHE_DIR="+cacheDirectory)
-}
-
-func verifyOpenTofuVersion(ctx context.Context, stdout io.Writer, stderr io.Writer, execute commandRunner) bool {
-	fmt.Fprintln(stdout, "==> verify OpenTofu version")
-	output, err := execute(ctx, nil, ".", "tofu", "version")
-	if err != nil {
-		fmt.Fprintf(stderr, "read OpenTofu version: %v\n", err)
-		return false
-	}
-	firstLine, _, _ := strings.Cut(strings.ReplaceAll(string(output), "\r\n", "\n"), "\n")
-	expected := "OpenTofu v" + requiredOpenTofuVersion
-	if firstLine != expected {
-		fmt.Fprintf(stderr, "OpenTofu version = %q, want %q\n", firstLine, expected)
-		return false
-	}
-	return true
-}
-
 func linuxBuildSteps() []step {
 	steps := make([]step, 0, len(gatePackages)*2)
 	for _, gate := range gatePackages {
@@ -305,7 +198,7 @@ func runSteps(ctx context.Context, steps []step, stdout io.Writer, stderr io.Wri
 
 func runStep(ctx context.Context, step step, stdout io.Writer, stderr io.Writer, execute commandRunner) bool {
 	fmt.Fprintln(stdout, "==>", step.name)
-	output, err := execute(ctx, step.environment, step.directory, step.executable, step.arguments...)
+	output, err := execute(ctx, step.environment, step.executable, step.arguments...)
 	if len(output) > 0 {
 		_, _ = stdout.Write(output)
 	}
@@ -376,34 +269,6 @@ func goFiles(root string) ([]string, error) {
 	return files, nil
 }
 
-func hclRoots(root string) ([]string, error) {
-	roots := make(map[string]struct{})
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			if ignoredDirectory(entry.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if filepath.Ext(path) == ".tf" {
-			roots[filepath.Dir(path)] = struct{}{}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	directories := make([]string, 0, len(roots))
-	for directory := range roots {
-		directories = append(directories, directory)
-	}
-	sort.Strings(directories)
-	return directories, nil
-}
-
 func ignoredDirectory(name string) bool {
 	switch name {
 	case ".build", ".git", ".cache", ".terraform", "coverage", "dist", "vendor":
@@ -413,11 +278,8 @@ func ignoredDirectory(name string) bool {
 	}
 }
 
-func runCommand(ctx context.Context, environment []string, directory string, executable string, arguments ...string) ([]byte, error) {
+func runCommand(ctx context.Context, environment []string, executable string, arguments ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, executable, arguments...)
 	command.Env = append(os.Environ(), environment...)
-	if directory != "" && directory != "." {
-		command.Dir = directory
-	}
 	return command.CombinedOutput()
 }

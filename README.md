@@ -33,8 +33,10 @@ The core never contains:
 Infrastructure as code is written in HCL and executed exclusively with
 OpenTofu. The engine and the Google provider are exactly pinned, provider GPG
 validation is enforced, and every reference stack commits its
-`.terraform.lock.hcl`. The decision rationale lives in
-`docs/conventions/infrastructure-as-code/`.
+`.terraform.lock.hcl`. The OpenTofu toolchain provisioning and gates are owned
+by the `opentofu` capability pack, declared through the `extends` list of the
+quality configuration seam; the pack contract lives in the shared-kernel
+registry under `capabilities/infrastructure/opentofu/`.
 
 ## Quality gates
 
@@ -48,9 +50,17 @@ go run -mod=readonly ./cmd/build
 Every executable Go package must reach exactly 100.0% statement coverage.
 `cmd/build` additionally enforces lint (staticcheck), fail-closed
 vulnerability analysis (govulncheck), Lefthook configuration validation, and
-the OpenTofu gates: engine version verification, recursive format check, and
+the Linux/AMD64 build of the gate binaries with module provenance. The
+OpenTofu gates — engine version verification, recursive format check, and
 `init` plus `validate` for every module, the policy bindings and every
-reference stack with enforced provider GPG validation.
+reference stack with enforced provider GPG validation — are owned by the
+`opentofu` capability pack and run in the canonical quality lane.
+
+The CI surface is the canonical thin callers of the repository-governance
+home (`ci.yml`, `codeql.yml`, `dependency-review.yml`) plus the
+`canonical-conformance.yml` lane, which proves the bindings of this
+repository against the home fail-closed. The canonical quality lane
+provisions the declared capability packs before the gate runs.
 
 The Go toolchain is pinned exactly (`toolchain go1.26.6`,
 `GOTOOLCHAIN=local`); no lane downloads a toolchain at build time. Build tools
@@ -66,6 +76,9 @@ disclosed vulnerabilities fail closed even without source changes.
 - `internal/packaging/` contains the same-package workflow contract tests.
 - `docs/` contains architecture, conventions, and development
   documentation.
+- `repo-bindings.json` is the tenant binding manifest of the canonical
+  adoption: the home pin, the caller hashes, the canonical file bindings, and
+  the config-seam and tooling-module pins.
 
 ## Governance
 

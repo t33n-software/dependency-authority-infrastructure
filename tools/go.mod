@@ -6,9 +6,14 @@ toolchain go1.26.6
 
 tool (
 	github.com/evilmartians/lefthook/v2
+	github.com/t33n-software/go-quality-authority/cmd/check-coverage
+	github.com/t33n-software/go-quality-authority/cmd/quality-gate
+	github.com/t33n-software/repository-governance/cmd/verify-canonical
 	golang.org/x/vuln/cmd/govulncheck
 	honnef.co/go/tools/cmd/staticcheck
 )
+
+require github.com/t33n-software/supply-chain-governance v0.0.0-20260827105518-e2ca604c8e93
 
 require (
 	al.essio.dev/pkg/shellescape v1.6.0 // indirect
@@ -55,6 +60,8 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/schollz/progressbar/v3 v3.19.1 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
+	github.com/t33n-software/go-quality-authority v0.0.0-20260827113658-5ee4105ff6a8 // indirect
+	github.com/t33n-software/repository-governance v0.0.0-20260827184532-d30fd11588a2 // indirect
 	github.com/tidwall/jsonc v0.3.3 // indirect
 	github.com/urfave/cli/v3 v3.10.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
