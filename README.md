@@ -43,17 +43,19 @@ registry under `capabilities/infrastructure/opentofu/`.
 ```text
 gofmt
 go test ./...
-go run -mod=readonly ./cmd/check-coverage
-go run -mod=readonly ./cmd/build
+go tool -modfile tools/go.mod check-coverage
+go tool -modfile tools/go.mod quality-gate
 ```
 
 Every executable Go package must reach exactly 100.0% statement coverage.
-`cmd/build` additionally enforces lint (staticcheck), fail-closed
-vulnerability analysis (govulncheck), Lefthook configuration validation, and
-the Linux/AMD64 build of the gate binaries with module provenance. The
-OpenTofu gates — engine version verification, recursive format check, and
-`init` plus `validate` for every module, the policy bindings and every
-reference stack with enforced provider GPG validation — are owned by the
+`quality-gate` runs the canonical gate chain of the go-quality-authority
+territory home through the pinned tooling module: Go formatting, module
+checksums and metadata, the pinned build tool module, lint (staticcheck), unit
+tests, exact 100% statement coverage, race detector, static analysis,
+fail-closed vulnerability analysis (govulncheck), and Lefthook configuration
+validation. The OpenTofu gates — engine version verification, recursive format
+check, and `init` plus `validate` for every module, the policy bindings and
+every reference stack with enforced provider GPG validation — are owned by the
 `opentofu` capability pack and run in the canonical quality lane.
 
 The CI surface is the canonical thin callers of the repository-governance
@@ -72,7 +74,6 @@ disclosed vulnerabilities fail closed even without source changes.
 - `modules/` contains the seven generic modules.
 - `policy-bindings/` contains the project-level policy module.
 - `stacks/` contains the five trust-zone reference stacks.
-- `cmd/` contains the build and coverage gates.
 - `internal/packaging/` contains the same-package workflow contract tests.
 - `docs/` contains architecture, conventions, and development
   documentation.

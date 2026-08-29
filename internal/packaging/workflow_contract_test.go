@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -195,12 +196,11 @@ func TestCapabilityPackDeclarationBindsTheOpenTofuGates(t *testing.T) {
 		}
 	}
 
-	// The repository-local build gate no longer executes the OpenTofu gates:
-	// they are pack-owned and run in the canonical quality lane.
-	build := readRepositoryFile(t, filepath.Join("cmd", "build", "main.go"))
-	for _, forbidden := range []string{`"tofu"`, "tofuPluginCacheDirectory", "requiredOpenTofuVersion"} {
-		if strings.Contains(build, forbidden) {
-			t.Fatalf("cmd/build still carries the OpenTofu gate reference %q; the gates are pack-owned", forbidden)
+	// The OpenTofu gates are pack-owned and run in the canonical quality lane;
+	// no repo-local gate chain copy exists that could carry them.
+	for _, chainCopy := range []string{"cmd/build", "cmd/check-coverage"} {
+		if _, err := os.Stat(repositoryPath(filepath.FromSlash(chainCopy))); !os.IsNotExist(err) {
+			t.Fatalf("the repo-local gate chain copy %s must not exist; the gates are pack-owned or canonical", chainCopy)
 		}
 	}
 }
@@ -393,11 +393,40 @@ func TestModuleIdentityAndQualityContract(t *testing.T) {
 		`"schemaVersion": 4`,
 		`"language": "go"`,
 		`"version": "1.26.6"`,
+		`"extends": ["opentofu@1"]`,
 		"dependency-authority-infrastructure-source-quality",
-		"./cmd/build",
 	} {
 		if !strings.Contains(quality, required) {
 			t.Fatalf("git-governance.quality.json does not contain %q", required)
+		}
+	}
+
+	var qualityConfig struct {
+		Gates []struct {
+			Name    string   `json:"name"`
+			Command string   `json:"command"`
+			Args    []string `json:"args"`
+		} `json:"gates"`
+	}
+	if err := json.Unmarshal([]byte(quality), &qualityConfig); err != nil {
+		t.Fatalf("git-governance.quality.json is not valid JSON: %v", err)
+	}
+	if len(qualityConfig.Gates) != 1 {
+		t.Fatalf("git-governance.quality.json carries %d gates, want exactly the canonical gate chain", len(qualityConfig.Gates))
+	}
+	if qualityConfig.Gates[0].Name != "dependency-authority-infrastructure-source-quality" ||
+		qualityConfig.Gates[0].Command != "go" ||
+		!slices.Equal(qualityConfig.Gates[0].Args, []string{"tool", "-modfile", "tools/go.mod", "quality-gate"}) {
+		t.Fatal("the gate does not invoke the canonical gate chain through the tooling module pin")
+	}
+	for _, forbidden := range []string{`"./cmd/build"`, `"./cmd/check-coverage"`, `"defaults"`, `"project"`} {
+		if strings.Contains(quality, forbidden) {
+			t.Fatalf("git-governance.quality.json still contains %s", forbidden)
+		}
+	}
+	for _, chainCopy := range []string{"cmd/build", "cmd/check-coverage"} {
+		if _, err := os.Stat(repositoryPath(filepath.FromSlash(chainCopy))); !os.IsNotExist(err) {
+			t.Fatalf("the repo-local gate chain copy %s must not exist", chainCopy)
 		}
 	}
 
