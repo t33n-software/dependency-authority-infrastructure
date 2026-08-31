@@ -294,8 +294,10 @@ func TestCoreContainsNoConcreteBindings(t *testing.T) {
 	// scan: the canonical callers and the conformance lane reference the home
 	// coordinate, the binding manifest records the home pin, lefthook.yml names
 	// the governed Git toolchain binary, the rule-sets conventions README names
-	// the canonical organization source of truth for the GitHub rule-sets, and
-	// TRACEABILITY.md records this repository's own governed decisions — source
+	// the canonical organization source of truth for the GitHub rule-sets,
+	// TRACEABILITY.md records this repository's own governed decisions, and the
+	// license-hub onboarding values name this repository's own canonical source
+	// coordinate under the digest-locked, byte-verified render contract — source
 	// and tool references, not organization or tenant bindings of this core.
 	governedReferenceExempt := []string{
 		".github/workflows/ci.yml",
@@ -306,6 +308,7 @@ func TestCoreContainsNoConcreteBindings(t *testing.T) {
 		"docs/conventions/hosting-plattform/github/rule-sets/README.md",
 		"docs/TRACEABILITY.md",
 		"lefthook.yml",
+		"license.values.json",
 	}
 	for _, path := range repositoryFiles(t, []string{".tf", ".yml", ".yaml", ".json", ".md"}) {
 		slashed := filepath.ToSlash(path)
