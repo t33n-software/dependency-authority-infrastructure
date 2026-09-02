@@ -20,23 +20,28 @@ variable "description" {
 }
 
 variable "format" {
-  description = "Package format. The dependency authority operates GO, NPM and PYTHON package repositories plus GENERIC evidence repositories."
+  description = "Package format. The dependency authority operates GO, NPM and PYTHON package repositories, GENERIC evidence repositories and DOCKER workload image repositories."
   type        = string
 
   validation {
-    condition     = contains(["GO", "NPM", "PYTHON", "GENERIC"], var.format)
-    error_message = "format must be one of GO, NPM, PYTHON, GENERIC."
+    condition     = contains(["GO", "NPM", "PYTHON", "GENERIC", "DOCKER"], var.format)
+    error_message = "format must be one of GO, NPM, PYTHON, GENERIC, DOCKER."
   }
 }
 
 variable "mode" {
-  description = "Repository mode. Intake zones use REMOTE_REPOSITORY; quarantine, approved and evidence zones use STANDARD_REPOSITORY. Virtual consumer endpoints are out of scope for this module."
+  description = "Repository mode. Intake zones use REMOTE_REPOSITORY; quarantine, approved and evidence zones use STANDARD_REPOSITORY. DOCKER workload image repositories always use STANDARD_REPOSITORY. Virtual consumer endpoints are out of scope for this module."
   type        = string
   default     = "STANDARD_REPOSITORY"
 
   validation {
     condition     = contains(["STANDARD_REPOSITORY", "REMOTE_REPOSITORY"], var.mode)
     error_message = "mode must be STANDARD_REPOSITORY or REMOTE_REPOSITORY."
+  }
+
+  validation {
+    condition     = var.format != "DOCKER" || var.mode == "STANDARD_REPOSITORY"
+    error_message = "DOCKER workload image repositories always use STANDARD_REPOSITORY mode; the workload class never binds a remote upstream."
   }
 }
 
@@ -75,8 +80,8 @@ variable "remote_upstream" {
   }
 
   validation {
-    condition     = var.remote_upstream == null || var.format != "GENERIC"
-    error_message = "GENERIC evidence repositories do not support remote mode and therefore no remote_upstream binding."
+    condition     = var.remote_upstream == null || !contains(["GENERIC", "DOCKER"], var.format)
+    error_message = "GENERIC evidence repositories and DOCKER workload image repositories do not support remote mode and therefore no remote_upstream binding."
   }
 }
 
@@ -122,7 +127,7 @@ variable "kms_key_name" {
 }
 
 variable "labels" {
-  description = "Repository labels. The reference stacks bind boundary, zone and ecosystem labels."
+  description = "Repository labels. The reference stacks bind boundary, zone and ecosystem labels; the workload image registries bind boundary and zone."
   type        = map(string)
   default     = {}
 }
