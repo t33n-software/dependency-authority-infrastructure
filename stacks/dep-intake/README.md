@@ -2,8 +2,9 @@
 
 Reference stack of the intake trust zone: remote intake repositories per
 ecosystem, the intake fetcher workload identity, repository-scoped writer
-binding, project-level policy compensation and the audit export into the
-evidence archive.
+binding, project-level policy compensation, the audit export into the
+evidence archive and the zone's workload job of the in-perimeter execution
+substrate (`dep-intake-fetch`, executed as the intake fetcher identity).
 
 ## Boundary
 
@@ -17,15 +18,20 @@ evidence archive.
   provisions the project and its API surface first.
 - The audit export requires the dep-evidence archive bucket; provisioning
   order is dep-evidence first.
+- The workload job consumes its image by full immutable digest from the
+  release-class workload image registry only; the digest is an instance
+  binding (`planned` with a documented placeholder until the promotion
+  read-back proof flips it to `bound`), never a stack default.
 
 ## Inputs
 
 `project_id`, `location`, `ecosystems` (default `["go"]`), `pool_id`,
-`fetcher` (OIDC bindings of the intake fetcher), `evidence_bucket_name`,
-audit sink settings and `policy_constraints`.
+`fetcher` (OIDC bindings of the intake fetcher), `workload_job_images`
+(the instance-bound image digests keyed by canonical job name),
+`evidence_bucket_name`, audit sink settings and `policy_constraints`.
 
 ## Outputs
 
 Repository IDs and URIs per ecosystem, the fetcher service account email, the
-pool resource name, the audit sink writer identity and the enforced policy
-constraints.
+pool resource name, the audit sink writer identity, the enforced policy
+constraints and the workload job resource IDs keyed by canonical job name.

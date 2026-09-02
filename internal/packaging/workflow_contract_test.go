@@ -14,6 +14,7 @@ import (
 
 var moduleNames = []string{
 	"artifact-registry",
+	"cloud-run-job",
 	"evidence-archive",
 	"logging",
 	"network",
@@ -554,6 +555,115 @@ func TestControlStackDeclaresTheWorkloadImageRegistries(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-9") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-9")
+	}
+}
+
+func TestCloudRunJobModuleBindsTheGovernedConsumptionForm(t *testing.T) {
+	main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "main.tf")))
+	for _, required := range []string{
+		`resource "google_cloud_run_v2_job" "this"`,
+		`service_account = var.service_account_email`,
+		`image = var.image`,
+	} {
+		if !strings.Contains(main, required) {
+			t.Fatalf("modules/cloud-run-job/main.tf does not bind %q", required)
+		}
+	}
+
+	variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "variables.tf")))
+	for _, required := range []string{
+		`^dep-[a-z0-9]+(-[a-z0-9]+)*$`,
+		`^[^@\\s]+@sha256:[0-9a-f]{64}$`,
+		`/release-[^/]+/`,
+	} {
+		if !strings.Contains(variables, required) {
+			t.Fatalf("modules/cloud-run-job/variables.tf does not bind the fail-closed rule %q", required)
+		}
+	}
+
+	readme := readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "README.md"))
+	for _, required := range []string{"planned", "bound", "atomically", "release-class"} {
+		if !strings.Contains(readme, required) {
+			t.Fatalf("the cloud-run-job module README does not document %q", required)
+		}
+	}
+}
+
+func TestStacksDeclareTheCompleteWorkloadJobTopology(t *testing.T) {
+	// The canonical job matrix: exactly one job per lane operation in its own
+	// zone, each bound to the existing zone workload identity of its lane.
+	jobs := map[string]map[string]string{
+		"dep-intake": {
+			"dep-intake-fetch": "fetcher",
+		},
+		"dep-control": {
+			"dep-admission":    "admission",
+			"dep-promotion":    "promotion",
+			"dep-revalidation": "revalidation",
+			"dep-revocation":   "revocation",
+		},
+		"dep-evidence": {
+			"dep-evidence-write": "writer",
+			"dep-evidence-audit": "auditor",
+		},
+	}
+
+	declared := 0
+	for stack, bindings := range jobs {
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		for _, required := range []string{
+			`module "workload_jobs" {`,
+			`for_each = local.workload_jobs`,
+			`service_account_email = module.workload_identity.service_account_emails[each.value.identity_key]`,
+			`image = var.workload_job_images[each.key]`,
+		} {
+			if !strings.Contains(main, required) {
+				t.Fatalf("stacks/%s/main.tf does not declare %q", stack, required)
+			}
+		}
+		for name, identityKey := range bindings {
+			if !strings.Contains(main, `"`+name+`" = {`) {
+				t.Fatalf("stacks/%s/main.tf does not declare the canonical job %q", stack, name)
+			}
+			if !strings.Contains(main, `identity_key = "`+identityKey+`"`) {
+				t.Fatalf("stacks/%s/main.tf does not bind the job %q to the identity key %q", stack, name, identityKey)
+			}
+			declared++
+		}
+
+		variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf")))
+		start := strings.Index(variables, `variable "workload_job_images" {`)
+		if start < 0 {
+			t.Fatalf("stacks/%s/variables.tf does not carry the instance-supplied workload_job_images input", stack)
+		}
+		segment := variables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if strings.Contains(segment, "default") {
+			t.Fatalf("stacks/%s/variables.tf carries a default for workload_job_images; the image digest is an instance binding, never a stack default", stack)
+		}
+
+		outputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "outputs.tf")))
+		if !strings.Contains(outputs, `output "workload_job_ids"`) {
+			t.Fatalf("stacks/%s/outputs.tf does not export the workload job IDs", stack)
+		}
+	}
+	if declared != 7 {
+		t.Fatalf("the stacks declare %d workload jobs, want the complete canonical topology of 7", declared)
+	}
+
+	// Zone purity: the quarantine and approved zones never carry workload jobs.
+	for _, stack := range []string{"dep-approved", "dep-quarantine"} {
+		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
+		if strings.Contains(main, "workload_jobs") {
+			t.Fatalf("stacks/%s must never declare workload jobs; the topology is zone-pure", stack)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-10") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-10")
 	}
 }
 

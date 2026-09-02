@@ -10,6 +10,16 @@ locals {
       python = "PYPI"
     }
   }
+
+  # The canonical workload job topology of the intake zone: exactly one job
+  # per lane operation, bound to the existing zone workload identity. The
+  # image digest is an instance binding (planned until the promotion
+  # read-back proof flips it to bound), never a stack default.
+  workload_jobs = {
+    "dep-intake-fetch" = {
+      identity_key = "fetcher"
+    }
+  }
 }
 
 provider "google" {
@@ -63,6 +73,22 @@ module "repository_iam" {
   location   = var.location
   repository = module.repositories[each.key].id
   writers    = ["serviceAccount:${module.workload_identity.service_account_emails["fetcher"]}"]
+}
+
+module "workload_jobs" {
+  source   = "../../modules/cloud-run-job"
+  for_each = local.workload_jobs
+
+  project_id            = var.project_id
+  location              = var.location
+  name                  = each.key
+  service_account_email = module.workload_identity.service_account_emails[each.value.identity_key]
+  image                 = var.workload_job_images[each.key]
+
+  labels = {
+    boundary = "dependency-authority"
+    zone     = "intake"
+  }
 }
 
 module "audit_log_sink" {

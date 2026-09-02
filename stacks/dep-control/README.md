@@ -1,10 +1,12 @@
 # Stack: dep-control
 
 Reference stack of the control trust zone: the control-plane controller
-workload identities (admission, revalidation and revocation lanes), the zone
-workload identity pool, project-level policy compensation, the audit export
-into the evidence archive and the workload image registries of the
-in-perimeter execution substrate.
+workload identities (admission, promotion, revalidation and revocation
+lanes), the zone workload identity pool, project-level policy compensation,
+the audit export into the evidence archive, the workload image registries of
+the in-perimeter execution substrate and the zone's four workload jobs
+(`dep-admission`, `dep-promotion`, `dep-revalidation`, `dep-revocation`),
+each executed as the existing zone workload identity of its lane.
 
 ## Boundary
 
@@ -23,15 +25,21 @@ in-perimeter execution substrate.
   provisions the project and its API surface first.
 - The audit export requires the dep-evidence archive bucket; provisioning
   order is dep-evidence first.
+- The workload jobs consume their images by full immutable digest from the
+  release-class workload image registry only; the digests are instance
+  bindings (`planned` with documented placeholders until the promotion
+  read-back proofs flip them to `bound`), never stack defaults.
 
 ## Inputs
 
 `project_id`, `location`, `pool_id`, `controllers` (OIDC bindings of the
-controller identities), `evidence_bucket_name`, audit sink settings and
-`policy_constraints`.
+controller identities), `workload_job_images` (the instance-bound image
+digests keyed by canonical job name), `evidence_bucket_name`, audit sink
+settings and `policy_constraints`.
 
 ## Outputs
 
 Controller service account emails keyed by lane, the pool resource name, the
-audit sink writer identity, the enforced policy constraints and the workload
-image repository IDs and endpoint URIs keyed by class (`staging`, `release`).
+audit sink writer identity, the enforced policy constraints, the workload
+image repository IDs and endpoint URIs keyed by class (`staging`, `release`)
+and the workload job resource IDs keyed by canonical job name.

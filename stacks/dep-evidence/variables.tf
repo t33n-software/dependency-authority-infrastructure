@@ -98,6 +98,18 @@ variable "additional_auditor_members" {
   default     = []
 }
 
+variable "workload_job_images" {
+  description = <<-EOT
+    Workload job image bindings of the evidence zone, keyed by the canonical
+    job name (dep-evidence-write, dep-evidence-audit). The organization
+    instance supplies the full immutable digest of the promoted image from
+    the release-class workload image registry; a documented placeholder keeps
+    the binding planned and fails provisioning closed until the promotion
+    read-back proof exists.
+  EOT
+  type        = map(string)
+}
+
 variable "audit_sink_name" {
   description = "Name of the audit log sink of the evidence zone into its own archive."
   type        = string
