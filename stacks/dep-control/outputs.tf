@@ -3,6 +3,11 @@ output "controller_service_account_emails" {
   value       = module.workload_identity.service_account_emails
 }
 
+output "controller_trigger_service_account_emails" {
+  description = "Invoke-only trigger service account emails of the control-plane lanes, keyed by lane."
+  value       = module.workload_identity.trigger_service_account_emails
+}
+
 output "workload_identity_pool_name" {
   description = "Fully qualified Workload Identity Pool resource name of the control zone."
   value       = module.workload_identity.pool_name

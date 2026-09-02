@@ -10,21 +10,33 @@ locals {
 
   # The canonical workload job topology of the control zone: exactly one job
   # per lane operation, each bound to the existing zone workload identity of
-  # its lane. The image digests are instance bindings (planned until the
-  # promotion read-back proof flips them to bound), never stack defaults.
+  # its lane and invoked through its dedicated invoke-only trigger identity.
+  # The image digests are instance bindings (planned until the promotion
+  # read-back proof flips them to bound), never stack defaults.
   workload_jobs = {
     "dep-admission" = {
       identity_key = "admission"
+      trigger_id   = "dep-admission-trigger"
     }
     "dep-promotion" = {
       identity_key = "promotion"
+      trigger_id   = "dep-promotion-trigger"
     }
     "dep-revalidation" = {
       identity_key = "revalidation"
+      trigger_id   = "dep-revalidation-trigger"
     }
     "dep-revocation" = {
       identity_key = "revocation"
+      trigger_id   = "dep-revocation-trigger"
     }
+  }
+
+  # The invoke-only trigger identity of each controller lane, keyed by the
+  # lane identity key: the lane federates to this identity, never to the
+  # execution identity.
+  controller_triggers = {
+    for job, spec in local.workload_jobs : spec.identity_key => spec.trigger_id
   }
 }
 
@@ -64,7 +76,11 @@ module "workload_identity" {
   project_id = var.project_id
   pool_id    = var.pool_id
 
-  identities = var.controllers
+  identities = {
+    for lane, controller in var.controllers : lane => merge(controller, {
+      trigger_service_account_id = local.controller_triggers[lane]
+    })
+  }
 }
 
 module "workload_jobs" {
@@ -75,6 +91,7 @@ module "workload_jobs" {
   location              = var.location
   name                  = each.key
   service_account_email = module.workload_identity.service_account_emails[each.value.identity_key]
+  invoker_member        = "serviceAccount:${module.workload_identity.trigger_service_account_emails[each.value.identity_key]}"
   image                 = var.workload_job_images[each.key]
 
   labels = {

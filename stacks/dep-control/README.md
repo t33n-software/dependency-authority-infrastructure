@@ -6,7 +6,9 @@ lanes), the zone workload identity pool, project-level policy compensation,
 the audit export into the evidence archive, the workload image registries of
 the in-perimeter execution substrate and the zone's four workload jobs
 (`dep-admission`, `dep-promotion`, `dep-revalidation`, `dep-revocation`),
-each executed as the existing zone workload identity of its lane.
+each executed as the existing zone workload identity of its lane and invoked
+only through its dedicated invoke-only trigger identity
+(`dep-<operation>-trigger`).
 
 ## Boundary
 
@@ -34,6 +36,9 @@ each executed as the existing zone workload identity of its lane.
   release-class workload image registry only; the digests are instance
   bindings (`planned` with documented placeholders until the promotion
   read-back proofs flip them to `bound`), never stack defaults.
+- Each lane federates to the dedicated invoke-only trigger identity of its
+  job, never to the execution identity; a trigger identity holds invoke on
+  exactly its own job and no data-plane grant.
 
 ## Inputs
 
@@ -45,7 +50,8 @@ sink settings and `policy_constraints`.
 
 ## Outputs
 
-Controller service account emails keyed by lane, the pool resource name, the
-audit sink writer identity, the enforced policy constraints, the workload
-image repository IDs and endpoint URIs keyed by class (`staging`, `release`)
-and the workload job resource IDs keyed by canonical job name.
+Controller service account emails and their invoke-only trigger identity
+emails keyed by lane, the pool resource name, the audit sink writer
+identity, the enforced policy constraints, the workload image repository IDs
+and endpoint URIs keyed by class (`staging`, `release`) and the workload job
+resource IDs keyed by canonical job name.

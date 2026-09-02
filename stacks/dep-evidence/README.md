@@ -5,7 +5,9 @@ ecosystem, the long-term immutable retention archive, the evidence writer and
 auditor workload identities, repository-scoped bindings, project-level policy
 compensation, the zone's own audit export into the archive and the zone's
 workload jobs of the in-perimeter execution substrate (`dep-evidence-write`
-and `dep-evidence-audit`, executed as the writer and auditor identities).
+and `dep-evidence-audit`, executed as the writer and auditor identities and
+invoked only through their dedicated invoke-only trigger identities
+`dep-evidence-write-trigger` and `dep-evidence-audit-trigger`).
 
 ## Boundary
 
@@ -27,6 +29,9 @@ and `dep-evidence-audit`, executed as the writer and auditor identities).
   release-class workload image registry only; the digests are instance
   bindings (`planned` with documented placeholders until the promotion
   read-back proofs flip them to `bound`), never stack defaults.
+- Each lane federates to the dedicated invoke-only trigger identity of its
+  job, never to the execution identity; a trigger identity holds invoke on
+  exactly its own job and no data-plane grant.
 
 ## Inputs
 
@@ -41,6 +46,7 @@ and `additional_auditor_members`, audit sink settings and
 ## Outputs
 
 Evidence repository IDs per ecosystem, the archive bucket name (consumed by
-the other zone stacks), writer and auditor service account emails, the pool
-resource name, the audit sink writer identity, the enforced policy
-constraints and the workload job resource IDs keyed by canonical job name.
+the other zone stacks), writer and auditor service account emails and their
+invoke-only trigger identity emails, the pool resource name, the audit sink
+writer identity, the enforced policy constraints and the workload job
+resource IDs keyed by canonical job name.

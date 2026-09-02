@@ -18,6 +18,11 @@ output "auditor_service_account_email" {
   value       = module.workload_identity.service_account_emails["auditor"]
 }
 
+output "workload_trigger_service_account_emails" {
+  description = "Invoke-only trigger service account emails of the evidence lanes, keyed by identity (writer, auditor)."
+  value       = module.workload_identity.trigger_service_account_emails
+}
+
 output "workload_identity_pool_name" {
   description = "Fully qualified Workload Identity Pool resource name of the evidence zone."
   value       = module.workload_identity.pool_name

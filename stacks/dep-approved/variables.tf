@@ -37,20 +37,22 @@ variable "identities" {
     the revocation controller and the revalidation controller are control-zone
     identities bound through the member inputs of this stack. With the default
     empty map only the zone pool is created; any future zone-local identity is
-    a governed change.
+    a governed change and binds a dedicated invoke-only trigger service
+    account through trigger_service_account_id.
   EOT
   type = map(object({
-    provider_id         = string
-    service_account_id  = string
-    display_name        = optional(string, "")
-    description         = optional(string, "")
-    issuer_uri          = optional(string, "https://token.actions.githubusercontent.com")
-    allowed_audiences   = optional(list(string), [])
-    attribute_mapping   = optional(map(string))
-    attribute_condition = string
-    principal_attribute = optional(string, "repository")
-    principal_value     = string
-    roles               = optional(set(string), [])
+    provider_id                = string
+    service_account_id         = string
+    trigger_service_account_id = string
+    display_name               = optional(string, "")
+    description                = optional(string, "")
+    issuer_uri                 = optional(string, "https://token.actions.githubusercontent.com")
+    allowed_audiences          = optional(list(string), [])
+    attribute_mapping          = optional(map(string))
+    attribute_condition        = string
+    principal_attribute        = optional(string, "repository")
+    principal_value            = string
+    roles                      = optional(set(string), [])
   }))
   default = {}
 }

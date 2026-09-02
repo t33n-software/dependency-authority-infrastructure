@@ -98,6 +98,19 @@ infrastructure core.
    approved zone declares no zone-local workload identity by default, because
    the approved promoter is a control-zone identity bound through the member
    inputs of the approved stack.
+8. The external trigger seam binds a dedicated invoke-only trigger identity
+   per lane operation (`dep-<operation>-trigger`): the lane's
+   environment-scoped principal set federates to the trigger identity, never
+   to the execution identity, and the trigger identity holds
+   `roles/run.invoker` (carrying the invoke permission `run.jobs.run`) and
+   `roles/run.viewer` (carrying the execution status read-back
+   `run.executions.get` and `run.executions.list`) resource-scoped to exactly
+   its own job and no other grant anywhere — no data-plane role, no
+   project-level invoke permission and no shared trigger identity across
+   lanes. The execution identity is never federated from CI and keeps the
+   data-plane matrix of item 7. The role contents are proven against the
+   provider (`gcloud iam roles describe`), never assumed; the remaining
+   viewer permissions do not apply to a job resource.
 
 ## Consequences
 

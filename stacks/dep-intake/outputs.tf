@@ -13,6 +13,11 @@ output "fetcher_service_account_email" {
   value       = module.workload_identity.service_account_emails["fetcher"]
 }
 
+output "fetcher_trigger_service_account_email" {
+  description = "Email of the invoke-only trigger identity of the intake-fetch lane (dep-intake-fetch-trigger)."
+  value       = module.workload_identity.trigger_service_account_emails["fetcher"]
+}
+
 output "workload_identity_pool_name" {
   description = "Fully qualified Workload Identity Pool resource name of the intake zone."
   value       = module.workload_identity.pool_name

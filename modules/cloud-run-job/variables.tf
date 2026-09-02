@@ -30,6 +30,22 @@ variable "service_account_email" {
   }
 }
 
+variable "invoker_member" {
+  description = <<-EOT
+    The invoke-only trigger identity of the owning lane operation as an IAM
+    member string. The module binds it invoke-only on exactly this job; the
+    trigger identity never holds a data-plane permission, and the execution
+    identity of the job is never federated from CI.
+  EOT
+
+  type = string
+
+  validation {
+    condition     = can(regex("^serviceAccount:[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\\.iam\\.gserviceaccount\\.com$", var.invoker_member))
+    error_message = "invoker_member must be the serviceAccount member of the lane's dedicated invoke-only trigger identity."
+  }
+}
+
 variable "image" {
   description = <<-EOT
     Workload image reference of the job. The organization instance binds the

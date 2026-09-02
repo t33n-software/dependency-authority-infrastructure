@@ -819,6 +819,247 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	}
 }
 
+func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
+	// The canonical trigger identities: exactly one invoke-only trigger
+	// identity per lane operation, named after the canonical job.
+	triggers := map[string]map[string]string{
+		"dep-intake": {
+			"dep-intake-fetch": "dep-intake-fetch-trigger",
+		},
+		"dep-control": {
+			"dep-admission":    "dep-admission-trigger",
+			"dep-promotion":    "dep-promotion-trigger",
+			"dep-revalidation": "dep-revalidation-trigger",
+			"dep-revocation":   "dep-revocation-trigger",
+		},
+		"dep-evidence": {
+			"dep-evidence-write": "dep-evidence-write-trigger",
+			"dep-evidence-audit": "dep-evidence-audit-trigger",
+		},
+	}
+
+	declared := 0
+	for stack, jobs := range triggers {
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		for job, trigger := range jobs {
+			if !strings.Contains(main, `"`+job+`" = {`) {
+				t.Fatalf("stacks/%s/main.tf does not declare the canonical job %q", stack, job)
+			}
+			if !strings.Contains(main, `trigger_id = "`+trigger+`"`) {
+				t.Fatalf("stacks/%s/main.tf does not bind the canonical trigger identity %q to the job %q", stack, trigger, job)
+			}
+			declared++
+		}
+		if !strings.Contains(main, `invoker_member = "serviceAccount:${module.workload_identity.trigger_service_account_emails[each.value.identity_key]}"`) {
+			t.Fatalf("stacks/%s/main.tf does not bind the job invoker to the lane trigger identity", stack)
+		}
+		if strings.Count(main, "trigger_service_account_emails") != 1 {
+			t.Fatalf("stacks/%s/main.tf references the trigger identities outside the job invoker binding", stack)
+		}
+	}
+	if declared != 7 {
+		t.Fatalf("the stacks declare %d trigger identities, want the complete canonical set of 7", declared)
+	}
+
+	// The identity wiring injects the canonical trigger identity into every
+	// lane identity.
+	intakeMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "main.tf")))
+	if !strings.Contains(intakeMain, `fetcher = merge(var.fetcher, { trigger_service_account_id = local.workload_jobs["dep-intake-fetch"].trigger_id })`) {
+		t.Fatal("stacks/dep-intake/main.tf does not inject the trigger identity into the fetcher identity")
+	}
+	controlMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "main.tf")))
+	for _, required := range []string{
+		`controller_triggers = { for job, spec in local.workload_jobs : spec.identity_key => spec.trigger_id }`,
+		`for lane, controller in var.controllers : lane => merge(controller, { trigger_service_account_id = local.controller_triggers[lane] })`,
+	} {
+		if !strings.Contains(controlMain, required) {
+			t.Fatalf("stacks/dep-control/main.tf does not bind %q", required)
+		}
+	}
+	evidenceMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "main.tf")))
+	for _, required := range []string{
+		`writer = merge(var.writer, { trigger_service_account_id = local.workload_jobs["dep-evidence-write"].trigger_id })`,
+		`auditor = merge(var.auditor, { trigger_service_account_id = local.workload_jobs["dep-evidence-audit"].trigger_id })`,
+	} {
+		if !strings.Contains(evidenceMain, required) {
+			t.Fatalf("stacks/dep-evidence/main.tf does not bind %q", required)
+		}
+	}
+
+	// The workload-identity module owns the trigger identities: one dedicated
+	// service account per lane, the principal-set binding on the trigger
+	// identity and never on the execution identity, and no roles for the
+	// trigger identity.
+	identityMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "workload-identity", "main.tf")))
+	if !strings.Contains(identityMain, `resource "google_service_account" "trigger"`) {
+		t.Fatal("modules/workload-identity/main.tf does not create the dedicated trigger identities")
+	}
+	bindingStart := strings.Index(identityMain, `resource "google_service_account_iam_member" "workload_identity_user"`)
+	if bindingStart < 0 {
+		t.Fatal("modules/workload-identity/main.tf does not carry the principal-set binding")
+	}
+	bindingSegment := identityMain[bindingStart:]
+	if next := strings.Index(bindingSegment, ` resource "`); next > 0 {
+		bindingSegment = bindingSegment[:next]
+	}
+	if !strings.Contains(bindingSegment, `service_account_id = google_service_account.trigger[each.key].name`) {
+		t.Fatal("the principal-set binding must federate the trigger identity")
+	}
+	if strings.Contains(bindingSegment, `google_service_account.this[`) {
+		t.Fatal("the principal-set binding must never federate the execution identity")
+	}
+	rolesStart := strings.Index(identityMain, `resource "google_project_iam_member" "identity_roles"`)
+	if rolesStart < 0 {
+		t.Fatal("modules/workload-identity/main.tf does not carry the identity roles binding")
+	}
+	if strings.Contains(identityMain[rolesStart:], "trigger") {
+		t.Fatal("the trigger identity must never receive a role")
+	}
+
+	identityVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "workload-identity", "variables.tf")))
+	for _, required := range []string{
+		`trigger_service_account_id = string`,
+		`identity.trigger_service_account_id != identity.service_account_id`,
+	} {
+		if !strings.Contains(identityVariables, required) {
+			t.Fatalf("modules/workload-identity/variables.tf does not bind %q", required)
+		}
+	}
+	if strings.Contains(identityVariables, `trigger_service_account_id = optional(`) {
+		t.Fatal("the trigger service account must be required, never optional")
+	}
+
+	identityOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "workload-identity", "outputs.tf")))
+	if !strings.Contains(identityOutputs, `output "trigger_service_account_emails"`) {
+		t.Fatal("modules/workload-identity/outputs.tf does not export the trigger identity emails")
+	}
+
+	// The cloud-run-job module binds the invoke-only grant on exactly the own
+	// job with the proven role contents.
+	jobMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "main.tf")))
+	for _, required := range []string{
+		`resource "google_cloud_run_v2_job_iam_member" "invoker"`,
+		`resource "google_cloud_run_v2_job_iam_member" "invoker_readback"`,
+		`role = "roles/run.invoker"`,
+		`role = "roles/run.viewer"`,
+		`member = var.invoker_member`,
+	} {
+		if !strings.Contains(jobMain, required) {
+			t.Fatalf("modules/cloud-run-job/main.tf does not bind %q", required)
+		}
+	}
+	jobVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "variables.tf")))
+	if !strings.Contains(jobVariables, `variable "invoker_member"`) {
+		t.Fatal("modules/cloud-run-job/variables.tf does not carry the invoker_member input")
+	}
+
+	// The invoke roles stay resource-scoped: no project-level Cloud Run grant
+	// exists anywhere in the core.
+	for _, path := range repositoryFiles(t, []string{".tf"}) {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%q) error = %v", path, err)
+		}
+		flattened := normalizeWhitespace(string(content))
+		if !strings.Contains(flattened, "google_project_iam_member") {
+			continue
+		}
+		for _, role := range []string{"roles/run.invoker", "roles/run.viewer"} {
+			if strings.Contains(flattened, role) {
+				t.Fatalf("%s grants %s at project level; the trigger identity holds invoke resource-scoped on exactly its own job", path, role)
+			}
+		}
+	}
+
+	// No trigger identity ever receives a data-plane grant: no repository IAM
+	// module block references the trigger identities.
+	for _, stack := range stackNames {
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		for _, segment := range strings.Split(main, `module "`) {
+			if !strings.Contains(segment, "modules/repository-iam") {
+				continue
+			}
+			if strings.Contains(segment, "trigger") {
+				t.Fatalf("stacks/%s binds a trigger identity in a repository IAM module; trigger identities never hold data-plane grants", stack)
+			}
+		}
+	}
+
+	// Zone purity: the quarantine and approved zones never carry trigger
+	// identities.
+	for _, stack := range []string{"dep-approved", "dep-quarantine"} {
+		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
+		if strings.Contains(main, "trigger") {
+			t.Fatalf("stacks/%s must never declare trigger identities; the topology is zone-pure", stack)
+		}
+	}
+
+	// The pass-through identity surfaces of the job-free zones carry the same
+	// required trigger field, so any future zone-local identity binds a
+	// dedicated trigger identity fail-closed.
+	for _, stack := range []string{"dep-approved", "dep-quarantine"} {
+		variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf")))
+		start := strings.Index(variables, `variable "identities" {`)
+		if start < 0 {
+			t.Fatalf("stacks/%s/variables.tf does not carry the optional identities input", stack)
+		}
+		segment := variables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if !strings.Contains(segment, `trigger_service_account_id = string`) {
+			t.Fatalf("stacks/%s/variables.tf does not carry the required trigger identity field in the identities input", stack)
+		}
+	}
+
+	// The stack outputs export the trigger identity emails for the instance
+	// bindings.
+	intakeOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "outputs.tf")))
+	if !strings.Contains(intakeOutputs, `output "fetcher_trigger_service_account_email"`) {
+		t.Fatal("stacks/dep-intake/outputs.tf does not export the trigger identity email")
+	}
+	controlOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "outputs.tf")))
+	if !strings.Contains(controlOutputs, `output "controller_trigger_service_account_emails"`) {
+		t.Fatal("stacks/dep-control/outputs.tf does not export the trigger identity emails")
+	}
+	evidenceOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "outputs.tf")))
+	if !strings.Contains(evidenceOutputs, `output "workload_trigger_service_account_emails"`) {
+		t.Fatal("stacks/dep-evidence/outputs.tf does not export the trigger identity emails")
+	}
+
+	// The module documentation carries the trigger identity form.
+	identityReadme := readRepositoryFile(t, filepath.Join("modules", "workload-identity", "README.md"))
+	if !strings.Contains(identityReadme, "trigger_service_account_id") {
+		t.Fatal("the workload-identity module README does not document the trigger identity")
+	}
+	jobReadme := readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "README.md"))
+	for _, required := range []string{"invoker_member", "roles/run.invoker", "roles/run.viewer"} {
+		if !strings.Contains(jobReadme, required) {
+			t.Fatalf("the cloud-run-job module README does not document %q", required)
+		}
+	}
+
+	// The architecture decision record carries the trigger identity decision
+	// including its exclusions.
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"invoke-only trigger identity",
+		"dep-<operation>-trigger",
+		"roles/run.invoker",
+		"roles/run.viewer",
+		"never federated",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the trigger identity decision element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-12") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-12")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {
