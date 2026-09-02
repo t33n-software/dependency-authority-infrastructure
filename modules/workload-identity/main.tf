@@ -54,10 +54,21 @@ resource "google_service_account" "this" {
   description  = each.value.description != "" ? each.value.description : null
 }
 
+# The dedicated invoke-only trigger identity of each lane: the lane principal
+# set federates to this identity, never to the execution identity, and this
+# identity never receives a role anywhere.
+resource "google_service_account" "trigger" {
+  for_each = var.identities
+
+  project     = var.project_id
+  account_id  = each.value.trigger_service_account_id
+  description = "Invoke-only trigger identity of the lane; holds invoke permission on exactly its own workload job and never a data-plane role."
+}
+
 resource "google_service_account_iam_member" "workload_identity_user" {
   for_each = var.identities
 
-  service_account_id = google_service_account.this[each.key].name
+  service_account_id = google_service_account.trigger[each.key].name
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.this.name}/attribute.${each.value.principal_attribute}/${each.value.principal_value}"
 }

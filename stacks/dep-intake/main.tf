@@ -12,12 +12,14 @@ locals {
   }
 
   # The canonical workload job topology of the intake zone: exactly one job
-  # per lane operation, bound to the existing zone workload identity. The
-  # image digest is an instance binding (planned until the promotion
-  # read-back proof flips it to bound), never a stack default.
+  # per lane operation, bound to the existing zone workload identity and
+  # invoked through its dedicated invoke-only trigger identity. The image
+  # digest is an instance binding (planned until the promotion read-back
+  # proof flips it to bound), never a stack default.
   workload_jobs = {
     "dep-intake-fetch" = {
       identity_key = "fetcher"
+      trigger_id   = "dep-intake-fetch-trigger"
     }
   }
 }
@@ -61,7 +63,9 @@ module "workload_identity" {
   pool_id    = var.pool_id
 
   identities = {
-    fetcher = var.fetcher
+    fetcher = merge(var.fetcher, {
+      trigger_service_account_id = local.workload_jobs["dep-intake-fetch"].trigger_id
+    })
   }
 }
 
@@ -84,6 +88,7 @@ module "workload_jobs" {
   location              = var.location
   name                  = each.key
   service_account_email = module.workload_identity.service_account_emails[each.value.identity_key]
+  invoker_member        = "serviceAccount:${module.workload_identity.trigger_service_account_emails[each.value.identity_key]}"
   image                 = var.workload_job_images[each.key]
 
   labels = {

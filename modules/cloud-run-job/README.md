@@ -26,9 +26,11 @@ data plane directly.
   release-class workload image registry — never a tag, never a mutable
   reference, never the staging class, never a dependency repository.
 - The job executes as the existing zone workload identity of its operation.
-  The lane identity holds invoke permission on exactly its own job and
-  nothing else; neither the lane nor the job identity ever holds a write
-  grant on a workload image registry.
+  The lane's dedicated invoke-only trigger identity is bound through
+  `invoker_member` with `roles/run.invoker` (the invoke permission
+  `run.jobs.run`) and `roles/run.viewer` (the execution status read-back)
+  resource-scoped to exactly this job and nothing else; neither the lane nor
+  the job identity ever holds a write grant on a workload image registry.
 - Operation inputs travel as validated execution parameters of the
   invocation; the workload re-validates them fail-closed before any effect.
   Static environment bindings carry no sensitive values.
@@ -43,6 +45,7 @@ module "dep_intake_fetch" {
   location              = "<region>"
   name                  = "dep-intake-fetch"
   service_account_email = "<zone-workload-identity-email>"
+  invoker_member        = "serviceAccount:<lane-trigger-identity-email>"
   image                 = "<region>-docker.pkg.dev/<organization>-dep-control/release-controller-images/dependency-intake-controller@sha256:<64 lowercase hex>"
 
   labels = {

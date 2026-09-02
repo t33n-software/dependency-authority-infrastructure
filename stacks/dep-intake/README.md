@@ -4,7 +4,9 @@ Reference stack of the intake trust zone: remote intake repositories per
 ecosystem, the intake fetcher workload identity, repository-scoped writer
 binding, project-level policy compensation, the audit export into the
 evidence archive and the zone's workload job of the in-perimeter execution
-substrate (`dep-intake-fetch`, executed as the intake fetcher identity).
+substrate (`dep-intake-fetch`, executed as the intake fetcher identity and
+invoked only through its dedicated invoke-only trigger identity
+`dep-intake-fetch-trigger`).
 
 ## Boundary
 
@@ -25,6 +27,9 @@ substrate (`dep-intake-fetch`, executed as the intake fetcher identity).
   release-class workload image registry only; the digest is an instance
   binding (`planned` with a documented placeholder until the promotion
   read-back proof flips it to `bound`), never a stack default.
+- The lane federates to the dedicated invoke-only trigger identity of the
+  job, never to the execution identity; the trigger identity holds invoke on
+  exactly `dep-intake-fetch` and no data-plane grant.
 
 ## Inputs
 
@@ -36,6 +41,7 @@ substrate (`dep-intake-fetch`, executed as the intake fetcher identity).
 
 ## Outputs
 
-Repository IDs and URIs per ecosystem, the fetcher service account email, the
-pool resource name, the audit sink writer identity, the enforced policy
-constraints and the workload job resource IDs keyed by canonical job name.
+Repository IDs and URIs per ecosystem, the fetcher service account email and
+its invoke-only trigger identity email, the pool resource name, the audit
+sink writer identity, the enforced policy constraints and the workload job
+resource IDs keyed by canonical job name.

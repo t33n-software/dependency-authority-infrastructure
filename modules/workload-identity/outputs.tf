@@ -22,3 +22,8 @@ output "principal_sets" {
   description = "Principal set strings bound to roles/iam.workloadIdentityUser, keyed by identity key."
   value       = { for key, binding in google_service_account_iam_member.workload_identity_user : key => binding.member }
 }
+
+output "trigger_service_account_emails" {
+  description = "Invoke-only trigger service account emails (the lane-facing identities), keyed by identity key."
+  value       = { for key, account in google_service_account.trigger : key => account.email }
+}
