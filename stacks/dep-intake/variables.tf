@@ -52,6 +52,17 @@ variable "evidence_bucket_name" {
   type        = string
 }
 
+variable "workload_job_images" {
+  description = <<-EOT
+    Workload job image bindings of the intake zone, keyed by the canonical job
+    name (dep-intake-fetch). The organization instance supplies the full
+    immutable digest of the promoted image from the release-class workload
+    image registry; a documented placeholder keeps the binding planned and
+    fails provisioning closed until the promotion read-back proof exists.
+  EOT
+  type        = map(string)
+}
+
 variable "audit_sink_name" {
   description = "Name of the audit log sink into the evidence archive."
   type        = string

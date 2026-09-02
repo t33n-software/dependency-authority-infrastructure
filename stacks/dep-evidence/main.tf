@@ -1,3 +1,18 @@
+locals {
+  # The canonical workload job topology of the evidence zone: exactly one job
+  # per lane operation, bound to the existing zone workload identity. The
+  # image digest is an instance binding (planned until the promotion
+  # read-back proof flips it to bound), never a stack default.
+  workload_jobs = {
+    "dep-evidence-write" = {
+      identity_key = "writer"
+    }
+    "dep-evidence-audit" = {
+      identity_key = "auditor"
+    }
+  }
+}
+
 provider "google" {
   project = var.project_id
 }
@@ -69,6 +84,22 @@ module "repository_iam" {
     ["serviceAccount:${module.workload_identity.service_account_emails["auditor"]}"],
     tolist(var.additional_auditor_members),
   )
+}
+
+module "workload_jobs" {
+  source   = "../../modules/cloud-run-job"
+  for_each = local.workload_jobs
+
+  project_id            = var.project_id
+  location              = var.location
+  name                  = each.key
+  service_account_email = module.workload_identity.service_account_emails[each.value.identity_key]
+  image                 = var.workload_job_images[each.key]
+
+  labels = {
+    boundary = "dependency-authority"
+    zone     = "evidence"
+  }
 }
 
 module "audit_log_sink" {

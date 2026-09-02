@@ -32,3 +32,8 @@ output "enforced_constraints" {
   description = "Organization-policy constraints enforced on the evidence project."
   value       = module.policy_bindings.enforced_constraints
 }
+
+output "workload_job_ids" {
+  description = "Fully qualified Cloud Run job resource IDs of the evidence zone, keyed by canonical job name."
+  value       = { for name, job in module.workload_jobs : name => job.id }
+}

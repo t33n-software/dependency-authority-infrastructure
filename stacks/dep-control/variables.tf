@@ -17,7 +17,8 @@ variable "pool_id" {
 variable "controllers" {
   description = <<-EOT
     Control-plane controller workload identities, keyed by lane (canonically
-    admission, revalidation and revocation). The organization instance binds
+    admission, promotion, revalidation and revocation — the workload job
+    topology references exactly these keys). The organization instance binds
     the exact repository, protected workflow reference, environment and
     audience through attribute_condition and principal_value, and assigns the
     canonical identity class names through service_account_id (for example
@@ -46,6 +47,18 @@ variable "controllers" {
 variable "evidence_bucket_name" {
   description = "Name of the evidence archive bucket provisioned by the dep-evidence stack. The control zone exports its audit logs there; provisioning order is dep-evidence first."
   type        = string
+}
+
+variable "workload_job_images" {
+  description = <<-EOT
+    Workload job image bindings of the control zone, keyed by the canonical
+    job name (dep-admission, dep-promotion, dep-revalidation, dep-revocation).
+    The organization instance supplies the full immutable digest of the
+    promoted image from the release-class workload image registry; a
+    documented placeholder keeps the binding planned and fails provisioning
+    closed until the promotion read-back proof exists.
+  EOT
+  type        = map(string)
 }
 
 variable "audit_sink_name" {

@@ -27,3 +27,8 @@ output "workload_image_registry_uris" {
   description = "Workload image repository endpoint URIs, keyed by class (staging, release)."
   value       = { for class, repository in module.workload_image_registries : class => repository.registry_uri }
 }
+
+output "workload_job_ids" {
+  description = "Fully qualified Cloud Run job resource IDs of the control zone, keyed by canonical job name."
+  value       = { for name, job in module.workload_jobs : name => job.id }
+}

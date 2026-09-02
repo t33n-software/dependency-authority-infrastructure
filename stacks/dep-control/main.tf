@@ -7,6 +7,25 @@ locals {
       description = "Dependency authority workload images release: the only workload consumption source, filled exclusively through promotion of a proven staging digest"
     }
   }
+
+  # The canonical workload job topology of the control zone: exactly one job
+  # per lane operation, each bound to the existing zone workload identity of
+  # its lane. The image digests are instance bindings (planned until the
+  # promotion read-back proof flips them to bound), never stack defaults.
+  workload_jobs = {
+    "dep-admission" = {
+      identity_key = "admission"
+    }
+    "dep-promotion" = {
+      identity_key = "promotion"
+    }
+    "dep-revalidation" = {
+      identity_key = "revalidation"
+    }
+    "dep-revocation" = {
+      identity_key = "revocation"
+    }
+  }
 }
 
 provider "google" {
@@ -46,6 +65,22 @@ module "workload_identity" {
   pool_id    = var.pool_id
 
   identities = var.controllers
+}
+
+module "workload_jobs" {
+  source   = "../../modules/cloud-run-job"
+  for_each = local.workload_jobs
+
+  project_id            = var.project_id
+  location              = var.location
+  name                  = each.key
+  service_account_email = module.workload_identity.service_account_emails[each.value.identity_key]
+  image                 = var.workload_job_images[each.key]
+
+  labels = {
+    boundary = "dependency-authority"
+    zone     = "control"
+  }
 }
 
 module "audit_log_sink" {
