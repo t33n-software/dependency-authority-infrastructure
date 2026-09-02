@@ -487,6 +487,76 @@ func TestGoToolchainAndBuildToolingContract(t *testing.T) {
 	}
 }
 
+func TestArtifactRegistryModuleBindsTheDockerWorkloadClass(t *testing.T) {
+	variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "variables.tf")))
+	for _, required := range []string{
+		`contains(["GO", "NPM", "PYTHON", "GENERIC", "DOCKER"], var.format)`,
+		`var.format != "DOCKER" || var.mode == "STANDARD_REPOSITORY"`,
+		`var.remote_upstream == null || !contains(["GENERIC", "DOCKER"], var.format)`,
+	} {
+		if !strings.Contains(variables, required) {
+			t.Fatalf("modules/artifact-registry/variables.tf does not bind %q", required)
+		}
+	}
+
+	readme := readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "README.md"))
+	if !strings.Contains(readme, "DOCKER") {
+		t.Fatal("the artifact-registry module README does not document the DOCKER workload image class")
+	}
+}
+
+func TestControlStackDeclaresTheWorkloadImageRegistries(t *testing.T) {
+	main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "main.tf")))
+	for _, required := range []string{
+		`staging = {`,
+		`release = {`,
+		`module "workload_image_registries" {`,
+		`for_each = local.workload_image_registries`,
+		`repository_id = "${each.key}-controller-images"`,
+		`format = "DOCKER"`,
+		`mode = "STANDARD_REPOSITORY"`,
+		`boundary = "dependency-authority"`,
+		`zone = "control"`,
+	} {
+		if !strings.Contains(main, required) {
+			t.Fatalf("stacks/dep-control/main.tf does not declare %q", required)
+		}
+	}
+	if strings.Contains(main, "remote_upstream") {
+		t.Fatal("the control stack must never bind a remote upstream for the workload image registries")
+	}
+	if strings.Contains(main, "ecosystem") {
+		t.Fatal("the workload image registries carry boundary and zone labels only, never an ecosystem label")
+	}
+
+	variables := readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tf"))
+	if !strings.Contains(variables, `variable "location"`) {
+		t.Fatal("stacks/dep-control/variables.tf does not carry the instance-supplied location input")
+	}
+
+	outputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "outputs.tf")))
+	for _, required := range []string{
+		`output "workload_image_repository_ids"`,
+		`output "workload_image_registry_uris"`,
+	} {
+		if !strings.Contains(outputs, required) {
+			t.Fatalf("stacks/dep-control/outputs.tf does not export %q", required)
+		}
+	}
+
+	readme := readRepositoryFile(t, filepath.Join("stacks", "dep-control", "README.md"))
+	for _, required := range []string{"staging-controller-images", "release-controller-images"} {
+		if !strings.Contains(readme, required) {
+			t.Fatalf("the dep-control stack README does not document %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-9") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-9")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {

@@ -17,3 +17,13 @@ output "enforced_constraints" {
   description = "Organization-policy constraints enforced on the control project."
   value       = module.policy_bindings.enforced_constraints
 }
+
+output "workload_image_repository_ids" {
+  description = "Fully qualified workload image repository resource IDs, keyed by class (staging, release)."
+  value       = { for class, repository in module.workload_image_registries : class => repository.id }
+}
+
+output "workload_image_registry_uris" {
+  description = "Workload image repository endpoint URIs, keyed by class (staging, release)."
+  value       = { for class, repository in module.workload_image_registries : class => repository.registry_uri }
+}

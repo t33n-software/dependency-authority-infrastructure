@@ -39,7 +39,12 @@ infrastructure core.
    upstream repositories, the quarantine and approved stacks bind standard
    repositories, and the evidence stack binds generic evidence repositories
    plus the retention archive. The approved zone is the only consumer
-   endpoint; intake and quarantine never serve consumers.
+   endpoint; intake and quarantine never serve consumers. The control stack
+   additionally binds the workload image registries of the in-perimeter
+   execution substrate: DOCKER standard repositories of the classes staging
+   (the only governed producer delivery target) and release (the only
+   workload consumption source, filled exclusively through promotion of a
+   proven staging digest), never remote and never dependency repositories.
 5. Revocation download rules (`google_artifact_registry_rule`) are runtime
    operations of the revocation controller and are intentionally not part of
    the static stacks. A revoked package or version is denied before a

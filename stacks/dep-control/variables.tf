@@ -3,6 +3,11 @@ variable "project_id" {
   type        = string
 }
 
+variable "location" {
+  description = "Artifact Registry location of the control-zone workload image registries."
+  type        = string
+}
+
 variable "pool_id" {
   description = "Workload Identity Pool ID of the control zone."
   type        = string
