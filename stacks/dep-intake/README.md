@@ -9,7 +9,10 @@ substrate (`dep-intake-fetch`, executed as the intake fetcher identity).
 ## Boundary
 
 - Intake repositories are never consumer endpoints; only the intake fetcher
-  writes, and no consumer identity receives access here.
+  writes, and no consumer identity receives access here. The only additional
+  readers are the control-plane identities of the canonical IAM target matrix
+  (canonically the admission and promotion lanes), wired through the
+  instance-supplied member input.
 - Go remote intake maps to `common_repository.uri = "https://proxy.golang.org"`;
   npm and python map to their public upstream enums. Private Go modules never
   enter through this remote repository; they require the separately governed
@@ -26,7 +29,8 @@ substrate (`dep-intake-fetch`, executed as the intake fetcher identity).
 ## Inputs
 
 `project_id`, `location`, `ecosystems` (default `["go"]`), `pool_id`,
-`fetcher` (OIDC bindings of the intake fetcher), `workload_job_images`
+`fetcher` (OIDC bindings of the intake fetcher), `additional_reader_members`
+(the matrix-bound control-plane readers), `workload_job_images`
 (the instance-bound image digests keyed by canonical job name),
 `evidence_bucket_name`, audit sink settings and `policy_constraints`.
 

@@ -61,6 +61,12 @@ variable "workload_job_images" {
   type        = map(string)
 }
 
+variable "cross_zone_workload_reader_members" {
+  description = "Workload identities of the other zones receiving read access on the release-class workload image registry across the project boundary — canonically the intake fetcher, the evidence writer and the evidence auditor, as bound by the canonical IAM target matrix. Wired by the organization instance; no identity ever receives a writer grant on either workload image registry class."
+  type        = set(string)
+  default     = []
+}
+
 variable "audit_sink_name" {
   description = "Name of the audit log sink into the evidence archive."
   type        = string

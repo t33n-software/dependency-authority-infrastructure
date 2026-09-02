@@ -83,6 +83,23 @@ module "workload_jobs" {
   }
 }
 
+# The canonical IAM target matrix of the workload image registries: every
+# zone lane identity reads the release class (the only workload consumption
+# source); no identity ever receives a writer grant on either class, and the
+# staging class carries no binding at all — it is filled exclusively by the
+# governed producer channel and is never a workload source.
+module "workload_image_registry_iam" {
+  source     = "../../modules/repository-iam"
+  project_id = var.project_id
+  location   = var.location
+  repository = module.workload_image_registries["release"].id
+
+  readers = concat(
+    [for lane in keys(var.controllers) : "serviceAccount:${module.workload_identity.service_account_emails[lane]}"],
+    tolist(var.cross_zone_workload_reader_members),
+  )
+}
+
 module "audit_log_sink" {
   source             = "../../modules/logging"
   project_id         = var.project_id

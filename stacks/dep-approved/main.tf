@@ -35,9 +35,7 @@ module "workload_identity" {
   project_id = var.project_id
   pool_id    = var.pool_id
 
-  identities = {
-    promoter = var.promoter
-  }
+  identities = var.identities
 }
 
 module "repository_iam" {
@@ -47,8 +45,8 @@ module "repository_iam" {
   project_id = var.project_id
   location   = var.location
   repository = module.repositories[each.key].id
-  writers    = ["serviceAccount:${module.workload_identity.service_account_emails["promoter"]}"]
-  readers    = var.consumer_members
+  writers    = [var.promoter_member, var.revocation_member]
+  readers    = concat([var.revalidation_reader_member], tolist(var.consumer_members))
 }
 
 module "audit_log_sink" {

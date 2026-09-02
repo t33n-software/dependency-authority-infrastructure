@@ -79,7 +79,10 @@ module "repository_iam" {
   project_id = var.project_id
   location   = var.location
   repository = module.repositories[each.key].id
-  writers    = ["serviceAccount:${module.workload_identity.service_account_emails["writer"]}"]
+  writers = concat(
+    ["serviceAccount:${module.workload_identity.service_account_emails["writer"]}"],
+    tolist(var.additional_writer_members),
+  )
   readers = concat(
     ["serviceAccount:${module.workload_identity.service_account_emails["auditor"]}"],
     tolist(var.additional_auditor_members),

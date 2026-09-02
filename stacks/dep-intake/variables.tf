@@ -47,6 +47,12 @@ variable "fetcher" {
   })
 }
 
+variable "additional_reader_members" {
+  description = "Members receiving read access on the intake repositories beyond the fetcher writer — canonically the admission controller and the approved promoter identities of the control zone, as bound by the canonical IAM target matrix. Wired by the organization instance; the fetcher and any consumer identity never appear here."
+  type        = set(string)
+  default     = []
+}
+
 variable "evidence_bucket_name" {
   description = "Name of the evidence archive bucket provisioned by the dep-evidence stack. The intake zone exports its audit logs there; provisioning order is dep-evidence first."
   type        = string
