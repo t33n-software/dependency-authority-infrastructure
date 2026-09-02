@@ -667,6 +667,158 @@ func TestStacksDeclareTheCompleteWorkloadJobTopology(t *testing.T) {
 	}
 }
 
+func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
+	// Intake: the fetcher is the only writer; the matrix readers (canonically
+	// the admission and promotion controllers of the control zone) arrive
+	// through the instance-wired member input.
+	intakeMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "main.tf")))
+	for _, required := range []string{
+		`writers = ["serviceAccount:${module.workload_identity.service_account_emails["fetcher"]}"]`,
+		`readers = var.additional_reader_members`,
+	} {
+		if !strings.Contains(intakeMain, required) {
+			t.Fatalf("stacks/dep-intake/main.tf does not bind the matrix form %q", required)
+		}
+	}
+	intakeVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "variables.tf")))
+	if !strings.Contains(intakeVariables, `variable "additional_reader_members" {`) {
+		t.Fatal("stacks/dep-intake/variables.tf does not carry the additional_reader_members input")
+	}
+
+	// Evidence: the writer appends; the matrix writers (canonically the
+	// admission, revalidation and revocation controllers of the control zone)
+	// and the matrix reader (the approved promoter) arrive through the member
+	// inputs.
+	evidenceMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "main.tf")))
+	for _, required := range []string{
+		`["serviceAccount:${module.workload_identity.service_account_emails["writer"]}"]`,
+		`tolist(var.additional_writer_members)`,
+		`tolist(var.additional_auditor_members)`,
+	} {
+		if !strings.Contains(evidenceMain, required) {
+			t.Fatalf("stacks/dep-evidence/main.tf does not bind the matrix form %q", required)
+		}
+	}
+	evidenceVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "variables.tf")))
+	if !strings.Contains(evidenceVariables, `variable "additional_writer_members" {`) {
+		t.Fatal("stacks/dep-evidence/variables.tf does not carry the additional_writer_members input")
+	}
+
+	// Approved: no zone-local workload identity; the promotion and revocation
+	// writes and the revalidation read are control-zone members bound through
+	// the member inputs.
+	approvedVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-approved", "variables.tf")))
+	if strings.Contains(approvedVariables, `variable "promoter" {`) {
+		t.Fatal("stacks/dep-approved/variables.tf still declares a zone-local promoter identity; the approved promoter is a control-zone identity")
+	}
+	start := strings.Index(approvedVariables, `variable "identities" {`)
+	if start < 0 {
+		t.Fatal("stacks/dep-approved/variables.tf does not carry the optional identities input")
+	}
+	segment := approvedVariables[start:]
+	if next := strings.Index(segment, ` variable "`); next > 0 {
+		segment = segment[:next]
+	}
+	if !strings.Contains(segment, "default = {}") {
+		t.Fatal("stacks/dep-approved/variables.tf must default identities to the empty map; the matrix binds no zone-local identity")
+	}
+	for _, required := range []string{
+		`variable "promoter_member" {`,
+		`variable "revocation_member" {`,
+		`variable "revalidation_reader_member" {`,
+	} {
+		if !strings.Contains(approvedVariables, required) {
+			t.Fatalf("stacks/dep-approved/variables.tf does not carry %q", required)
+		}
+	}
+
+	approvedMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-approved", "main.tf")))
+	for _, required := range []string{
+		`identities = var.identities`,
+		`writers = [var.promoter_member, var.revocation_member]`,
+		`readers = concat([var.revalidation_reader_member], tolist(var.consumer_members))`,
+	} {
+		if !strings.Contains(approvedMain, required) {
+			t.Fatalf("stacks/dep-approved/main.tf does not bind the matrix form %q", required)
+		}
+	}
+	if strings.Contains(approvedMain, `service_account_emails["promoter"]`) {
+		t.Fatal("stacks/dep-approved/main.tf still references the removed zone-local promoter identity")
+	}
+	approvedOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-approved", "outputs.tf")))
+	if strings.Contains(approvedOutputs, "promoter_service_account_email") {
+		t.Fatal("stacks/dep-approved/outputs.tf still exports the removed zone-local promoter identity")
+	}
+
+	// Control: every zone lane identity reads the release-class workload image
+	// registry (the four control-plane lanes directly, the other zones through
+	// the cross-zone member input); no writer on either class; the staging
+	// class carries no binding at all.
+	controlMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "main.tf")))
+	for _, required := range []string{
+		`module "workload_image_registry_iam" {`,
+		`repository = module.workload_image_registries["release"].id`,
+		`[for lane in keys(var.controllers) : "serviceAccount:${module.workload_identity.service_account_emails[lane]}"]`,
+		`tolist(var.cross_zone_workload_reader_members)`,
+	} {
+		if !strings.Contains(controlMain, required) {
+			t.Fatalf("stacks/dep-control/main.tf does not bind the matrix form %q", required)
+		}
+	}
+	if strings.Contains(controlMain, `workload_image_registries["staging"]`) {
+		t.Fatal("the staging workload image registry must never carry an IAM binding; it is filled exclusively by the governed producer channel")
+	}
+	iamStart := strings.Index(controlMain, `module "workload_image_registry_iam" {`)
+	if iamStart < 0 {
+		t.Fatal("stacks/dep-control/main.tf does not declare the workload image registry IAM module")
+	}
+	iamSegment := controlMain[iamStart:]
+	if next := strings.Index(iamSegment, ` module "`); next > 0 {
+		iamSegment = iamSegment[:next]
+	}
+	if strings.Contains(iamSegment, "writers") {
+		t.Fatal("the workload image registry IAM binds a writer; no identity ever receives a writer grant on either workload image registry class")
+	}
+	controlVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tf")))
+	if !strings.Contains(controlVariables, `variable "cross_zone_workload_reader_members" {`) {
+		t.Fatal("stacks/dep-control/variables.tf does not carry the cross_zone_workload_reader_members input")
+	}
+
+	// The break-glass recovery identity holds no data-plane grant anywhere.
+	for _, stack := range stackNames {
+		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
+		if strings.Contains(main, "break-glass") {
+			t.Fatalf("stacks/%s/main.tf references the break-glass recovery identity; the matrix grants it no data-plane role", stack)
+		}
+	}
+
+	// The architecture decision record carries the canonical matrix including
+	// its exclusions.
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"canonical IAM target matrix",
+		"dep-intake-fetcher",
+		"dep-admission-controller",
+		"dep-approved-promoter",
+		"dep-revalidation-controller",
+		"dep-revocation-controller",
+		"dep-evidence-writer",
+		"dep-evidence-auditor",
+		"dep-break-glass-recovery",
+		"release-controller-images",
+		"no data-plane grant",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the canonical IAM target matrix element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-11") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-11")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {

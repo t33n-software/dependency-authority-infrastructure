@@ -30,21 +30,59 @@ variable "pool_id" {
   default     = "dep-approved"
 }
 
-variable "promoter" {
+variable "identities" {
   description = <<-EOT
-    Workload identity binding of the approved promoter (canonical identity
-    class dep-approved-promoter). The organization instance binds the exact
-    repository, protected workflow reference, environment and audience through
-    attribute_condition and principal_value.
+    Optional workload identities of the approved zone. The canonical IAM
+    target matrix binds no zone-local identity here: the approved promoter,
+    the revocation controller and the revalidation controller are control-zone
+    identities bound through the member inputs of this stack. With the default
+    empty map only the zone pool is created; any future zone-local identity is
+    a governed change.
   EOT
-  type = object({
+  type = map(object({
     provider_id         = string
-    service_account_id  = optional(string, "dep-approved-promoter")
+    service_account_id  = string
+    display_name        = optional(string, "")
+    description         = optional(string, "")
+    issuer_uri          = optional(string, "https://token.actions.githubusercontent.com")
+    allowed_audiences   = optional(list(string), [])
+    attribute_mapping   = optional(map(string))
     attribute_condition = string
     principal_attribute = optional(string, "repository")
     principal_value     = string
     roles               = optional(set(string), [])
-  })
+  }))
+  default = {}
+}
+
+variable "promoter_member" {
+  description = "Member receiving write access on the approved repositories for promotion — canonically the service account of the dep-approved-promoter identity of the control zone, wired by the organization instance as part of the canonical IAM target matrix."
+  type        = string
+
+  validation {
+    condition     = can(regex("^serviceAccount:[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\\.iam\\.gserviceaccount\\.com$", var.promoter_member))
+    error_message = "promoter_member must be a fully formed serviceAccount member string of the control-zone promoter identity."
+  }
+}
+
+variable "revocation_member" {
+  description = "Member receiving write access on the approved repositories for revocation download-rule enforcement — canonically the service account of the dep-revocation-controller identity of the control zone, wired by the organization instance as part of the canonical IAM target matrix. The revocation download rules themselves stay runtime operations and are never static stack content."
+  type        = string
+
+  validation {
+    condition     = can(regex("^serviceAccount:[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\\.iam\\.gserviceaccount\\.com$", var.revocation_member))
+    error_message = "revocation_member must be a fully formed serviceAccount member string of the control-zone revocation controller identity."
+  }
+}
+
+variable "revalidation_reader_member" {
+  description = "Member receiving read access on the approved repositories for periodic revalidation — canonically the service account of the dep-revalidation-controller identity of the control zone, wired by the organization instance as part of the canonical IAM target matrix."
+  type        = string
+
+  validation {
+    condition     = can(regex("^serviceAccount:[a-z][a-z0-9-]*@[a-z][a-z0-9-]*\\.iam\\.gserviceaccount\\.com$", var.revalidation_reader_member))
+    error_message = "revalidation_reader_member must be a fully formed serviceAccount member string of the control-zone revalidation controller identity."
+  }
 }
 
 variable "consumer_members" {

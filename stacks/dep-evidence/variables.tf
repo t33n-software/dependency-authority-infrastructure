@@ -92,8 +92,14 @@ variable "archive_kms_key_name" {
   default     = null
 }
 
+variable "additional_writer_members" {
+  description = "Members receiving write access on the evidence repositories beyond the writer identity — canonically the admission, revalidation and revocation controllers of the control zone, as bound by the canonical IAM target matrix. Wired by the organization instance; evidence writes stay append-focused and never carry routine delete authority."
+  type        = set(string)
+  default     = []
+}
+
 variable "additional_auditor_members" {
-  description = "Additional read-only auditor members of the evidence repositories beyond the auditor identity. Defaults to none."
+  description = "Additional read-only auditor members of the evidence repositories beyond the auditor identity — canonically the approved promoter of the control zone for verified evidence reads before promotion, as bound by the canonical IAM target matrix. Defaults to none."
   type        = set(string)
   default     = []
 }

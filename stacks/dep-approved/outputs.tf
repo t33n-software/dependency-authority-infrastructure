@@ -8,11 +8,6 @@ output "registry_uris" {
   value       = { for ecosystem, repository in module.repositories : ecosystem => repository.registry_uri }
 }
 
-output "promoter_service_account_email" {
-  description = "Email of the approved promoter service account (dep-approved-promoter)."
-  value       = module.workload_identity.service_account_emails["promoter"]
-}
-
 output "workload_identity_pool_name" {
   description = "Fully qualified Workload Identity Pool resource name of the approved zone."
   value       = module.workload_identity.pool_name

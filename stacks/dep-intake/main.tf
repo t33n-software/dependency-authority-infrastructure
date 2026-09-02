@@ -73,6 +73,7 @@ module "repository_iam" {
   location   = var.location
   repository = module.repositories[each.key].id
   writers    = ["serviceAccount:${module.workload_identity.service_account_emails["fetcher"]}"]
+  readers    = var.additional_reader_members
 }
 
 module "workload_jobs" {

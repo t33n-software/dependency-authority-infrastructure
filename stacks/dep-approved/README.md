@@ -1,15 +1,20 @@
 # Stack: dep-approved
 
 Reference stack of the approved trust zone: standard repositories per
-ecosystem as the only dependency consumer endpoints, the approved promoter
-workload identity, repository-scoped writer and consumer reader bindings,
-project-level policy compensation and the audit export into the evidence
-archive.
+ecosystem as the only dependency consumer endpoints, the repository-scoped
+promotion, revocation and revalidation bindings of the control-zone
+identities, the consumer reader bindings, project-level policy compensation
+and the audit export into the evidence archive.
 
 ## Boundary
 
-- Approved repositories are the only dependency consumer endpoints; only the
-  promoter writes, consumers receive read-only access.
+- Approved repositories are the only dependency consumer endpoints; write
+  access is bound to the control-zone promoter and revocation controller
+  identities and read access to consumers and the control-zone revalidation
+  controller, all through the instance-supplied member inputs of the
+  canonical IAM target matrix. The stack creates no zone-local workload
+  identity by default (the zone pool is created without providers); any
+  future zone-local identity is a governed change.
 - Revocation is enforced at runtime through Artifact Registry download rules
   (`google_artifact_registry_rule`, `action = "DENY"`, `operation =
   "DOWNLOAD"`) by the revocation controller. This stack intentionally creates
@@ -25,11 +30,12 @@ archive.
 ## Inputs
 
 `project_id`, `location`, `ecosystems` (default `["go"]`), `pool_id`,
-`promoter` (OIDC bindings of the approved promoter), `consumer_members`,
-`evidence_bucket_name`, audit sink settings and `policy_constraints`.
+`identities` (default empty), the matrix-bound member inputs
+`promoter_member`, `revocation_member` and `revalidation_reader_member`,
+`consumer_members`, `evidence_bucket_name`, audit sink settings and
+`policy_constraints`.
 
 ## Outputs
 
-Repository IDs and consumer endpoint URIs per ecosystem, the promoter service
-account email, the pool resource name, the audit sink writer identity and the
-enforced policy constraints.
+Repository IDs and consumer endpoint URIs per ecosystem, the pool resource
+name, the audit sink writer identity and the enforced policy constraints.

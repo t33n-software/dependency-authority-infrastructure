@@ -55,6 +55,49 @@ infrastructure core.
    runtime, and schema version pins for policies and evidence. Instances wire
    the concrete project IDs, regions, OIDC bindings, members and retention
    values as reviewed instance configuration.
+7. The canonical IAM target matrix binds the data-plane roles of the eight
+   zone workload identities at repository scope through
+   `modules/repository-iam`, never at project scope, and cross-zone
+   authority only through the owning zone's instance-wired member inputs:
+
+   ```text
+   identity                     zone      repository-scoped grants
+   dep-intake-fetcher           intake    writer on *-dependencies-intake;
+                                          reader on release-controller-images
+   dep-admission-controller     control   reader on *-dependencies-intake;
+                                          writer on *-dependencies-evidence;
+                                          reader on release-controller-images
+   dep-approved-promoter        control   reader on *-dependencies-intake and
+                                          *-dependencies-evidence;
+                                          writer on *-dependencies-approved;
+                                          reader on release-controller-images
+   dep-revalidation-controller  control   reader on *-dependencies-approved;
+                                          writer on *-dependencies-evidence;
+                                          reader on release-controller-images
+   dep-revocation-controller    control   writer on *-dependencies-approved
+                                          (the revocation download rules stay
+                                          runtime operations) and
+                                          *-dependencies-evidence;
+                                          reader on release-controller-images
+   dep-evidence-writer          evidence  writer on *-dependencies-evidence;
+                                          reader on release-controller-images
+   dep-evidence-auditor         evidence  reader on *-dependencies-evidence;
+                                          reader on release-controller-images
+   dep-break-glass-recovery     control   no data-plane grant: time-bounded
+                                          break-glass recovery only, never
+                                          federated from CI
+   ```
+
+   The matrix binds its exclusions with the same force: the quarantine
+   repositories carry no routine identity grant (investigation is an
+   operator-bound activity through the governed operator channel, and any
+   future quarantine writer is a governed change); no identity ever holds a
+   writer grant on either workload image registry class; the staging class
+   carries no binding at all; the scanner invocation of the admission
+   controller is an external API call and carries no plane grant; and the
+   approved zone declares no zone-local workload identity by default, because
+   the approved promoter is a control-zone identity bound through the member
+   inputs of the approved stack.
 
 ## Consequences
 

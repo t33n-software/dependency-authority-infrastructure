@@ -21,6 +21,11 @@ each executed as the existing zone workload identity of its lane.
 - Controller identities receive their repository access in the intake,
   quarantine, approved and evidence zones through those zones' member inputs;
   cross-zone authority is never granted project-wide here.
+- The canonical IAM target matrix of the workload image registries: every
+  zone lane identity (the four control-plane lanes here, the other zones
+  through the instance-supplied member input) receives read access on the
+  release class; no identity ever receives a writer grant on either class,
+  and the staging class carries no binding at all.
 - The stack creates no project and enables no APIs; the organization instance
   provisions the project and its API surface first.
 - The audit export requires the dep-evidence archive bucket; provisioning
@@ -34,8 +39,9 @@ each executed as the existing zone workload identity of its lane.
 
 `project_id`, `location`, `pool_id`, `controllers` (OIDC bindings of the
 controller identities), `workload_job_images` (the instance-bound image
-digests keyed by canonical job name), `evidence_bucket_name`, audit sink
-settings and `policy_constraints`.
+digests keyed by canonical job name), `cross_zone_workload_reader_members`
+(the matrix-bound readers of the other zones), `evidence_bucket_name`, audit
+sink settings and `policy_constraints`.
 
 ## Outputs
 

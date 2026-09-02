@@ -10,7 +10,10 @@ and `dep-evidence-audit`, executed as the writer and auditor identities).
 ## Boundary
 
 - Evidence is append-only: the writer appends, the auditor reads, and no
-  identity receives routine delete authority.
+  identity receives routine delete authority. The only additional writers and
+  readers are the control-plane identities of the canonical IAM target matrix
+  (canonically the admission, revalidation and revocation lanes writing, the
+  promotion lane reading), wired through the instance-supplied member inputs.
 - The retention archive pairs the operational evidence repositories; a
   deletable repository version alone is not a long-term evidence control.
 - `lock_retention_policy` stays `false` until the retention and legal-hold
@@ -31,8 +34,9 @@ and `dep-evidence-audit`, executed as the writer and auditor identities).
 `writer` and `auditor` (OIDC bindings), `workload_job_images` (the
 instance-bound image digests keyed by canonical job name),
 `archive_bucket_name`, `retention_period_seconds`, `lock_retention_policy`,
-optional `archive_kms_key_name` and `additional_auditor_members`, audit sink
-settings and `policy_constraints`.
+optional `archive_kms_key_name`, the matrix-bound `additional_writer_members`
+and `additional_auditor_members`, audit sink settings and
+`policy_constraints`.
 
 ## Outputs
 
