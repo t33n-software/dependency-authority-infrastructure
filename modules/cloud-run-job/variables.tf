@@ -8,6 +8,39 @@ variable "location" {
   type        = string
 }
 
+variable "network" {
+  description = <<-EOT
+    Resource ID of the zone VPC network the job attaches to
+    (projects/<project>/global/networks/<network>). The workload network
+    origin is part of the execution contract: the job routes all outgoing
+    traffic through its zone VPC, so its calls to the restricted planes
+    originate inside the perimeter; a job without the attachment is not
+    provisionable.
+  EOT
+
+  type = string
+
+  validation {
+    condition     = can(regex("^projects/[^/]+/global/networks/[a-z][a-z0-9-]*$", var.network))
+    error_message = "network must be a VPC network resource ID of the form projects/<project>/global/networks/<network>."
+  }
+}
+
+variable "subnetwork" {
+  description = <<-EOT
+    Resource ID of the zone subnetwork the job attaches to
+    (projects/<project>/regions/<region>/subnetworks/<subnetwork>). The
+    subnetwork lives in the job region and carries Private Google Access.
+  EOT
+
+  type = string
+
+  validation {
+    condition     = can(regex("^projects/[^/]+/regions/[a-z][a-z0-9-]+/subnetworks/[a-z][a-z0-9-]*$", var.subnetwork))
+    error_message = "subnetwork must be a subnetwork resource ID of the form projects/<project>/regions/<region>/subnetworks/<subnetwork>."
+  }
+}
+
 variable "name" {
   description = "Canonical workload job name. Every lane operation owns exactly one job named dep-<operation> in its own zone."
 

@@ -564,6 +564,11 @@ func TestCloudRunJobModuleBindsTheGovernedConsumptionForm(t *testing.T) {
 		`resource "google_cloud_run_v2_job" "this"`,
 		`service_account = var.service_account_email`,
 		`image = var.image`,
+		`vpc_access {`,
+		`network_interfaces {`,
+		`network = var.network`,
+		`subnetwork = var.subnetwork`,
+		`egress = "ALL_TRAFFIC"`,
 	} {
 		if !strings.Contains(main, required) {
 			t.Fatalf("modules/cloud-run-job/main.tf does not bind %q", required)
@@ -575,14 +580,32 @@ func TestCloudRunJobModuleBindsTheGovernedConsumptionForm(t *testing.T) {
 		`^dep-[a-z0-9]+(-[a-z0-9]+)*$`,
 		`^[^@\\s]+@sha256:[0-9a-f]{64}$`,
 		`/release-[^/]+/`,
+		`^projects/[^/]+/global/networks/[a-z][a-z0-9-]*$`,
+		`^projects/[^/]+/regions/[a-z][a-z0-9-]+/subnetworks/[a-z][a-z0-9-]*$`,
 	} {
 		if !strings.Contains(variables, required) {
 			t.Fatalf("modules/cloud-run-job/variables.tf does not bind the fail-closed rule %q", required)
 		}
 	}
 
+	// The network origin is a mandatory instance binding: neither the network
+	// nor the subnetwork input carries a default.
+	for _, name := range []string{"network", "subnetwork"} {
+		start := strings.Index(variables, `variable "`+name+`" {`)
+		if start < 0 {
+			t.Fatalf("modules/cloud-run-job/variables.tf does not carry the mandatory %s input", name)
+		}
+		segment := variables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if strings.Contains(segment, "default") {
+			t.Fatalf("modules/cloud-run-job/variables.tf carries a default for %s; the network origin is an instance binding, never a default", name)
+		}
+	}
+
 	readme := readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "README.md"))
-	for _, required := range []string{"planned", "bound", "atomically", "release-class"} {
+	for _, required := range []string{"planned", "bound", "atomically", "release-class", "Direct VPC egress"} {
 		if !strings.Contains(readme, required) {
 			t.Fatalf("the cloud-run-job module README does not document %q", required)
 		}
@@ -703,6 +726,9 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	if !strings.Contains(evidenceVariables, `variable "additional_writer_members" {`) {
 		t.Fatal("stacks/dep-evidence/variables.tf does not carry the additional_writer_members input")
 	}
+	if !strings.Contains(evidenceVariables, "intake fetcher") {
+		t.Fatal("stacks/dep-evidence/variables.tf does not name the intake fetcher as a canonical evidence writer; the intake use case writes its candidate records into the evidence repository")
+	}
 
 	// Approved: no zone-local workload identity; the promotion and revocation
 	// writes and the revalidation read are control-zone members bound through
@@ -797,7 +823,7 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
 	for _, required := range []string{
 		"canonical IAM target matrix",
-		"dep-intake-fetcher",
+		"dep-intake-fetcher intake writer on *-dependencies-intake and *-dependencies-evidence",
 		"dep-admission-controller",
 		"dep-approved-promoter",
 		"dep-revalidation-controller",
@@ -940,13 +966,16 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 	for _, required := range []string{
 		`resource "google_cloud_run_v2_job_iam_member" "invoker"`,
 		`resource "google_cloud_run_v2_job_iam_member" "invoker_readback"`,
-		`role = "roles/run.invoker"`,
+		`role = "roles/run.jobsExecutorWithOverrides"`,
 		`role = "roles/run.viewer"`,
 		`member = var.invoker_member`,
 	} {
 		if !strings.Contains(jobMain, required) {
 			t.Fatalf("modules/cloud-run-job/main.tf does not bind %q", required)
 		}
+	}
+	if strings.Contains(jobMain, "roles/run.invoker") {
+		t.Fatal("modules/cloud-run-job/main.tf still binds roles/run.invoker; the lane invocation is an override execution and requires roles/run.jobsExecutorWithOverrides")
 	}
 	jobVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "variables.tf")))
 	if !strings.Contains(jobVariables, `variable "invoker_member"`) {
@@ -964,7 +993,7 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 		if !strings.Contains(flattened, "google_project_iam_member") {
 			continue
 		}
-		for _, role := range []string{"roles/run.invoker", "roles/run.viewer"} {
+		for _, role := range []string{"roles/run.jobsExecutorWithOverrides", "roles/run.viewer"} {
 			if strings.Contains(flattened, role) {
 				t.Fatalf("%s grants %s at project level; the trigger identity holds invoke resource-scoped on exactly its own job", path, role)
 			}
@@ -1033,7 +1062,7 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 		t.Fatal("the workload-identity module README does not document the trigger identity")
 	}
 	jobReadme := readRepositoryFile(t, filepath.Join("modules", "cloud-run-job", "README.md"))
-	for _, required := range []string{"invoker_member", "roles/run.invoker", "roles/run.viewer"} {
+	for _, required := range []string{"invoker_member", "roles/run.jobsExecutorWithOverrides", "roles/run.viewer"} {
 		if !strings.Contains(jobReadme, required) {
 			t.Fatalf("the cloud-run-job module README does not document %q", required)
 		}
@@ -1045,7 +1074,8 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 	for _, required := range []string{
 		"invoke-only trigger identity",
 		"dep-<operation>-trigger",
-		"roles/run.invoker",
+		"roles/run.jobsExecutorWithOverrides",
+		"run.jobs.runWithOverrides",
 		"roles/run.viewer",
 		"never federated",
 	} {
@@ -1057,6 +1087,172 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-12") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-12")
+	}
+}
+
+func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
+	// The network module carries the zone workload network origin surface:
+	// exactly one VPC with one Private Google Access subnetwork in the job
+	// region, the restricted-range DNS response policy and the egress firewall
+	// pair ordered around priority 1000.
+	networkMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "network", "main.tf")))
+	for _, required := range []string{
+		`resource "google_compute_network" "workload"`,
+		`auto_create_subnetworks = false`,
+		`resource "google_compute_subnetwork" "workload"`,
+		`private_ip_google_access = true`,
+		`resource "google_dns_response_policy" "workload"`,
+		`resource "google_dns_response_policy_rule" "restricted_googleapis"`,
+		`dns_name = "*.googleapis.com."`,
+		`rrdatas = ["199.36.153.4", "199.36.153.5", "199.36.153.6", "199.36.153.7"]`,
+		`resource "google_compute_firewall" "allow_restricted_googleapis_egress"`,
+		`resource "google_compute_firewall" "deny_all_egress"`,
+		`destination_ranges = ["199.36.153.4/30"]`,
+		`priority = 999`,
+		`priority = 1001`,
+		`direction = "EGRESS"`,
+	} {
+		if !strings.Contains(networkMain, required) {
+			t.Fatalf("modules/network/main.tf does not declare the workload network origin element %q", required)
+		}
+	}
+
+	networkVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "network", "variables.tf")))
+	if !strings.Contains(networkVariables, `variable "workload_network" {`) {
+		t.Fatal("modules/network/variables.tf does not carry the workload_network input")
+	}
+	if !strings.Contains(networkVariables, `default = null`) {
+		t.Fatal("modules/network/variables.tf must default workload_network to null; the job-free zones declare no workload network")
+	}
+
+	networkOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "network", "outputs.tf")))
+	for _, required := range []string{
+		`output "workload_network_id"`,
+		`output "workload_subnetwork_id"`,
+	} {
+		if !strings.Contains(networkOutputs, required) {
+			t.Fatalf("modules/network/outputs.tf does not export %q", required)
+		}
+	}
+
+	networkReadme := readRepositoryFile(t, filepath.Join("modules", "network", "README.md"))
+	for _, required := range []string{"workload network origin", "Private Google Access", "restricted.googleapis.com", "Direct VPC egress"} {
+		if !strings.Contains(networkReadme, required) {
+			t.Fatalf("the network module README does not document %q", required)
+		}
+	}
+
+	// The three job-zone stacks declare their zone network through the network
+	// module, wire it into their workload jobs and enforce the form through the
+	// Cloud Run organization policies by default.
+	for _, stack := range []string{"dep-intake", "dep-control", "dep-evidence"} {
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		for _, required := range []string{
+			`module "network" {`,
+			`source = "../../modules/network"`,
+			`workload_network = merge(var.workload_network, { region = var.location })`,
+			`network = module.network.workload_network_id`,
+			`subnetwork = module.network.workload_subnetwork_id`,
+			`cloud_run_vpc_egress_all_traffic_only = var.policy_constraints.cloud_run_vpc_egress_all_traffic_only`,
+			`cloud_run_ingress_internal_only = var.policy_constraints.cloud_run_ingress_internal_only`,
+		} {
+			if !strings.Contains(main, required) {
+				t.Fatalf("stacks/%s/main.tf does not declare the workload network origin element %q", stack, required)
+			}
+		}
+
+		variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf")))
+		start := strings.Index(variables, `variable "workload_network" {`)
+		if start < 0 {
+			t.Fatalf("stacks/%s/variables.tf does not carry the workload_network input", stack)
+		}
+		segment := variables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if strings.Contains(segment, "default") {
+			t.Fatalf("stacks/%s/variables.tf carries a default for workload_network; the zone network is an instance binding, never a stack default", stack)
+		}
+		for _, required := range []string{
+			`cloud_run_vpc_egress_all_traffic_only = optional(bool, true)`,
+			`cloud_run_ingress_internal_only = optional(bool, true)`,
+		} {
+			if !strings.Contains(variables, required) {
+				t.Fatalf("stacks/%s/variables.tf does not default the Cloud Run enforcement %q to the enforced posture", stack, required)
+			}
+		}
+
+		outputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "outputs.tf")))
+		for _, required := range []string{
+			`output "workload_network_id"`,
+			`output "workload_subnetwork_id"`,
+		} {
+			if !strings.Contains(outputs, required) {
+				t.Fatalf("stacks/%s/outputs.tf does not export %q", stack, required)
+			}
+		}
+	}
+
+	// Zone purity: the job-free zones never declare a workload network or the
+	// Cloud Run enforcement surface.
+	for _, stack := range []string{"dep-approved", "dep-quarantine"} {
+		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
+		if strings.Contains(main, "workload_network") {
+			t.Fatalf("stacks/%s must never declare a workload network; the topology is zone-pure", stack)
+		}
+		variables := readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf"))
+		for _, forbidden := range []string{`variable "workload_network"`, "cloud_run_vpc_egress", "cloud_run_ingress"} {
+			if strings.Contains(variables, forbidden) {
+				t.Fatalf("stacks/%s/variables.tf must never carry %q; the job-free zones enforce no Cloud Run form", stack, forbidden)
+			}
+		}
+	}
+
+	// The policy bindings carry the opt-in Cloud Run enforcement surface.
+	policyMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("policy-bindings", "main.tf")))
+	for _, required := range []string{
+		`resource "google_org_policy_policy" "cloud_run_vpc_egress"`,
+		`resource "google_org_policy_policy" "cloud_run_ingress"`,
+		`"projects/${var.project_id}/policies/run.allowedVPCEgress"`,
+		`"projects/${var.project_id}/policies/run.allowedIngress"`,
+		`allowed_values = ["all-traffic"]`,
+		`allowed_values = ["internal"]`,
+	} {
+		if !strings.Contains(policyMain, required) {
+			t.Fatalf("policy-bindings/main.tf does not declare the Cloud Run enforcement element %q", required)
+		}
+	}
+	policyVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("policy-bindings", "variables.tf")))
+	for _, required := range []string{
+		`variable "cloud_run_vpc_egress_all_traffic_only" {`,
+		`variable "cloud_run_ingress_internal_only" {`,
+	} {
+		if !strings.Contains(policyVariables, required) {
+			t.Fatalf("policy-bindings/variables.tf does not carry %q", required)
+		}
+	}
+	if strings.Count(policyVariables, "default = false") != 2 {
+		t.Fatal("the Cloud Run enforcement constraints are opt-in and default to not-enforced")
+	}
+
+	// The architecture decision record carries the network origin decision.
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"workload network origin",
+		"Direct VPC egress",
+		"all-traffic",
+		"199.36.153.4/30",
+		"run.allowedVPCEgress",
+		"run.allowedIngress",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the workload network origin element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-13") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-13")
 	}
 }
 

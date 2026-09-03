@@ -24,10 +24,26 @@ module "policy_bindings" {
   source     = "../../policy-bindings"
   project_id = var.project_id
 
-  disable_service_account_key_creation = var.policy_constraints.disable_service_account_key_creation
-  disable_service_account_key_upload   = var.policy_constraints.disable_service_account_key_upload
-  uniform_bucket_level_access          = var.policy_constraints.uniform_bucket_level_access
-  public_access_prevention             = var.policy_constraints.public_access_prevention
+  disable_service_account_key_creation  = var.policy_constraints.disable_service_account_key_creation
+  disable_service_account_key_upload    = var.policy_constraints.disable_service_account_key_upload
+  uniform_bucket_level_access           = var.policy_constraints.uniform_bucket_level_access
+  public_access_prevention              = var.policy_constraints.public_access_prevention
+  cloud_run_vpc_egress_all_traffic_only = var.policy_constraints.cloud_run_vpc_egress_all_traffic_only
+  cloud_run_ingress_internal_only       = var.policy_constraints.cloud_run_ingress_internal_only
+}
+
+# The zone workload network origin: exactly one VPC with one subnetwork in the
+# job region carrying Private Google Access, the restricted-range DNS response
+# policy and the egress firewall pair. The zone's workload jobs attach to it
+# with Direct VPC egress and all-traffic routing, so their calls to the
+# restricted planes originate inside the perimeter.
+module "network" {
+  source     = "../../modules/network"
+  project_id = var.project_id
+
+  workload_network = merge(var.workload_network, {
+    region = var.location
+  })
 }
 
 module "repositories" {
@@ -106,6 +122,8 @@ module "workload_jobs" {
   service_account_email = module.workload_identity.service_account_emails[each.value.identity_key]
   invoker_member        = "serviceAccount:${module.workload_identity.trigger_service_account_emails[each.value.identity_key]}"
   image                 = var.workload_job_images[each.key]
+  network               = module.network.workload_network_id
+  subnetwork            = module.network.workload_subnetwork_id
 
   labels = {
     boundary = "dependency-authority"

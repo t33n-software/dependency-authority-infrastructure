@@ -4,8 +4,30 @@ variable "project_id" {
 }
 
 variable "location" {
-  description = "Artifact Registry location of the evidence repositories and Cloud Storage location of the retention archive."
+  description = "Artifact Registry location of the evidence repositories, Cloud Storage location of the retention archive and the job region of the zone workload network."
   type        = string
+}
+
+variable "workload_network" {
+  description = <<-EOT
+    The zone workload network origin binding: the VPC network name, the
+    subnetwork name and the subnetwork CIDR of the zone VPC. The stack
+    declares exactly one VPC with one subnetwork in the job region (the stack
+    location) carrying Private Google Access, the restricted-range DNS
+    response policy and the egress firewall pair; the zone's workload jobs
+    attach to it with Direct VPC egress and all-traffic routing. All values
+    are instance-supplied.
+  EOT
+  type = object({
+    network_name = string
+    subnet_name  = string
+    subnet_cidr  = string
+  })
+
+  validation {
+    condition     = can(cidrhost(var.workload_network.subnet_cidr, 0))
+    error_message = "workload_network.subnet_cidr must be a valid CIDR range."
+  }
 }
 
 variable "ecosystems" {
@@ -93,7 +115,7 @@ variable "archive_kms_key_name" {
 }
 
 variable "additional_writer_members" {
-  description = "Members receiving write access on the evidence repositories beyond the writer identity — canonically the admission, revalidation and revocation controllers of the control zone, as bound by the canonical IAM target matrix. Wired by the organization instance; evidence writes stay append-focused and never carry routine delete authority."
+  description = "Members receiving write access on the evidence repositories beyond the writer identity — canonically the intake fetcher (the intake use case writes its candidate records into the evidence repository) and the admission, revalidation and revocation controllers of the control zone, as bound by the canonical IAM target matrix. Wired by the organization instance; evidence writes stay append-focused and never carry routine delete authority."
   type        = set(string)
   default     = []
 }
@@ -129,12 +151,14 @@ variable "audit_log_filter" {
 }
 
 variable "policy_constraints" {
-  description = "Project-level organization-policy compensation for the absent organization node. All constraints default to the enforced posture."
+  description = "Project-level organization-policy compensation for the absent organization node. All constraints default to the enforced posture; the job-owning zones additionally enforce the Cloud Run workload network origin form by default."
   type = object({
-    disable_service_account_key_creation = optional(bool, true)
-    disable_service_account_key_upload   = optional(bool, true)
-    uniform_bucket_level_access          = optional(bool, true)
-    public_access_prevention             = optional(bool, true)
+    disable_service_account_key_creation  = optional(bool, true)
+    disable_service_account_key_upload    = optional(bool, true)
+    uniform_bucket_level_access           = optional(bool, true)
+    public_access_prevention              = optional(bool, true)
+    cloud_run_vpc_egress_all_traffic_only = optional(bool, true)
+    cloud_run_ingress_internal_only       = optional(bool, true)
   })
   default = {}
 }

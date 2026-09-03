@@ -26,3 +26,15 @@ variable "public_access_prevention" {
   type        = bool
   default     = true
 }
+
+variable "cloud_run_vpc_egress_all_traffic_only" {
+  description = "Restrict the deployable Cloud Run VPC egress settings on the project to all-traffic only (constraints/run.allowedVPCEgress). The workload network origin form — every job routes all outgoing traffic through its zone VPC — becomes the only deployable form, so the platform enforces it rather than convention alone. Opt-in: only the job-owning zones enable it."
+  type        = bool
+  default     = false
+}
+
+variable "cloud_run_ingress_internal_only" {
+  description = "Restrict the deployable Cloud Run ingress settings on the project to internal only (constraints/run.allowedIngress). Workload jobs never receive external ingress; the workload ingress prohibition of the perimeter holds absolutely. Opt-in: only the job-owning zones enable it."
+  type        = bool
+  default     = false
+}

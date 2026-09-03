@@ -42,3 +42,13 @@ output "workload_job_ids" {
   description = "Fully qualified Cloud Run job resource IDs of the evidence zone, keyed by canonical job name."
   value       = { for name, job in module.workload_jobs : name => job.id }
 }
+
+output "workload_network_id" {
+  description = "Resource ID of the zone workload VPC, bound by the zone's workload jobs."
+  value       = module.network.workload_network_id
+}
+
+output "workload_subnetwork_id" {
+  description = "Resource ID of the zone workload subnetwork, bound by the zone's workload jobs."
+  value       = module.network.workload_subnetwork_id
+}
