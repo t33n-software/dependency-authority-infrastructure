@@ -62,8 +62,12 @@ infrastructure core.
 
    ```text
    identity                     zone      repository-scoped grants
-   dep-intake-fetcher           intake    writer on *-dependencies-intake;
-                                          reader on release-controller-images
+   dep-intake-fetcher           intake    writer on *-dependencies-intake and
+                                           *-dependencies-evidence (the intake
+                                           use case writes its candidate
+                                           records into the evidence
+                                           repository);
+                                           reader on release-controller-images
    dep-admission-controller     control   reader on *-dependencies-intake;
                                           writer on *-dependencies-evidence;
                                           reader on release-controller-images
@@ -102,15 +106,41 @@ infrastructure core.
    per lane operation (`dep-<operation>-trigger`): the lane's
    environment-scoped principal set federates to the trigger identity, never
    to the execution identity, and the trigger identity holds
-   `roles/run.invoker` (carrying the invoke permission `run.jobs.run`) and
+   `roles/run.jobsExecutorWithOverrides` (carrying `run.jobs.run`,
+   `run.jobs.runWithOverrides` and `run.executions.cancel`) and
    `roles/run.viewer` (carrying the execution status read-back
    `run.executions.get` and `run.executions.list`) resource-scoped to exactly
    its own job and no other grant anywhere — no data-plane role, no
    project-level invoke permission and no shared trigger identity across
-   lanes. The execution identity is never federated from CI and keeps the
-   data-plane matrix of item 7. The role contents are proven against the
-   provider (`gcloud iam roles describe`), never assumed; the remaining
-   viewer permissions do not apply to a job resource.
+   lanes. The lane passes the operation inputs as execution-parameter
+   overrides of the invocation, so the invoke call is an override execution
+   that requires `run.jobs.runWithOverrides`; the plain `roles/run.invoker`
+   form is insufficient for it. The execution identity is never federated
+   from CI and keeps the data-plane matrix of item 7. The role contents are
+   proven against the provider (`gcloud iam roles describe`), never assumed;
+   the remaining viewer permissions do not apply to a job resource.
+9. The workload network origin is part of the execution contract: every
+   job-owning zone (intake, control, evidence) declares exactly one VPC with
+   one subnetwork in the job region carrying Private Google Access through
+   the network module, and every workload job attaches to its zone VPC with
+   Direct VPC egress routing all outgoing traffic through it (the
+   `cloud-run-job` module hardcodes the egress setting `ALL_TRAFFIC` and
+   takes the network and subnetwork as mandatory, fail-closed validated
+   instance inputs). A serverless job without the zone network attachment
+   presents no in-perimeter network origin: its calls to the restricted
+   planes are evaluated as external to the perimeter and fail closed, and the
+   zone-project membership of the workload does not by itself place its calls
+   inside — the network origin is the third perimeter dimension beside
+   identity and resource. The zone VPC carries the restricted-range DNS
+   response policy (`*.googleapis.com` resolves to `restricted.googleapis.com`,
+   `199.36.153.4/30`) and exactly two egress firewall rules (allow TCP 443 to
+   the restricted range ordered before priority 1000, deny all egress ordered
+   after priority 1000), and the project-level policy compensation restricts
+   Cloud Run to exactly this form (`run.allowedVPCEgress` allows only
+   `all-traffic`, `run.allowedIngress` allows only `internal`), so the
+   platform enforces the form rather than convention alone. The quarantine
+   and approved zones carry no workload network: they own no jobs (zone
+   purity).
 
 ## Consequences
 

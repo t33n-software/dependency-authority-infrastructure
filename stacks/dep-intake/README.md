@@ -3,10 +3,12 @@
 Reference stack of the intake trust zone: remote intake repositories per
 ecosystem, the intake fetcher workload identity, repository-scoped writer
 binding, project-level policy compensation, the audit export into the
-evidence archive and the zone's workload job of the in-perimeter execution
-substrate (`dep-intake-fetch`, executed as the intake fetcher identity and
-invoked only through its dedicated invoke-only trigger identity
-`dep-intake-fetch-trigger`).
+evidence archive, the zone workload network origin (one VPC with one Private
+Google Access subnetwork in the job region, the restricted-range DNS response
+policy and the egress firewall pair) and the zone's workload job of the
+in-perimeter execution substrate (`dep-intake-fetch`, executed as the intake
+fetcher identity and invoked only through its dedicated invoke-only trigger
+identity `dep-intake-fetch-trigger`).
 
 ## Boundary
 
@@ -27,6 +29,13 @@ invoked only through its dedicated invoke-only trigger identity
   release-class workload image registry only; the digest is an instance
   binding (`planned` with a documented placeholder until the promotion
   read-back proof flips it to `bound`), never a stack default.
+- The workload job attaches to the zone VPC declared by this stack and routes
+  all outgoing traffic through it (Direct VPC egress, all-traffic): the
+  workload network origin is part of the execution contract, and the stack
+  enforces the form through the Cloud Run organization policies
+  (`run.allowedVPCEgress` allows only all-traffic, `run.allowedIngress`
+  allows only internal). A job without the zone network attachment presents
+  no in-perimeter network origin and fails closed at the perimeter.
 - The lane federates to the dedicated invoke-only trigger identity of the
   job, never to the execution identity; the trigger identity holds invoke on
   exactly `dep-intake-fetch` and no data-plane grant.
@@ -37,11 +46,13 @@ invoked only through its dedicated invoke-only trigger identity
 `fetcher` (OIDC bindings of the intake fetcher), `additional_reader_members`
 (the matrix-bound control-plane readers), `workload_job_images`
 (the instance-bound image digests keyed by canonical job name),
+`workload_network` (the instance-bound zone VPC names and CIDR),
 `evidence_bucket_name`, audit sink settings and `policy_constraints`.
 
 ## Outputs
 
 Repository IDs and URIs per ecosystem, the fetcher service account email and
 its invoke-only trigger identity email, the pool resource name, the audit
-sink writer identity, the enforced policy constraints and the workload job
-resource IDs keyed by canonical job name.
+sink writer identity, the enforced policy constraints, the workload job
+resource IDs keyed by canonical job name and the workload network and
+subnetwork resource IDs.

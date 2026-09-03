@@ -25,12 +25,22 @@ data plane directly.
 - The image reference is always the full immutable `@sha256:` digest of a
   release-class workload image registry — never a tag, never a mutable
   reference, never the staging class, never a dependency repository.
+- The job attaches to its zone VPC through the mandatory `network` and
+  `subnetwork` inputs and routes all outgoing traffic through it as
+  Direct VPC egress with the hardcoded `ALL_TRAFFIC` setting, never an input:
+  the workload network origin is part of the execution contract, because a
+  job without the zone network attachment presents no in-perimeter network
+  origin and its calls to the restricted planes fail closed at the perimeter.
 - The job executes as the existing zone workload identity of its operation.
   The lane's dedicated invoke-only trigger identity is bound through
-  `invoker_member` with `roles/run.invoker` (the invoke permission
-  `run.jobs.run`) and `roles/run.viewer` (the execution status read-back)
-  resource-scoped to exactly this job and nothing else; neither the lane nor
-  the job identity ever holds a write grant on a workload image registry.
+  `invoker_member` with `roles/run.jobsExecutorWithOverrides` (the lane passes
+  the operation inputs as execution-parameter overrides of the invocation, so
+  the invoke call is an override execution requiring `run.jobs.runWithOverrides`;
+  the role carries `run.jobs.run`, `run.jobs.runWithOverrides` and
+  `run.executions.cancel`) and `roles/run.viewer` (the execution status
+  read-back) resource-scoped to exactly this job and nothing else; neither the
+  lane nor the job identity ever holds a write grant on a workload image
+  registry.
 - Operation inputs travel as validated execution parameters of the
   invocation; the workload re-validates them fail-closed before any effect.
   Static environment bindings carry no sensitive values.
@@ -47,6 +57,8 @@ module "dep_intake_fetch" {
   service_account_email = "<zone-workload-identity-email>"
   invoker_member        = "serviceAccount:<lane-trigger-identity-email>"
   image                 = "<region>-docker.pkg.dev/<organization>-dep-control/release-controller-images/dependency-intake-controller@sha256:<64 lowercase hex>"
+  network               = "projects/<organization>-dep-intake/global/networks/<zone-vpc>"
+  subnetwork            = "projects/<organization>-dep-intake/regions/<region>/subnetworks/<zone-subnet>"
 
   labels = {
     boundary = "dependency-authority"
