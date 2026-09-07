@@ -162,3 +162,13 @@ variable "policy_constraints" {
   })
   default = {}
 }
+
+variable "forensics_group" {
+  description = "Member string of the organization-owned forensics group (the canonical identity class dep-forensics-readers) receiving the read-only diagnostic bindings on this zone project. Supplied by the organization instance; never carried by the core."
+  type        = string
+
+  validation {
+    condition     = can(regex("^group:dep-forensics-readers@", var.forensics_group))
+    error_message = "forensics_group must be the group member string of the canonical dep-forensics-readers identity class."
+  }
+}

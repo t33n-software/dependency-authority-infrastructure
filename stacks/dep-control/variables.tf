@@ -113,3 +113,36 @@ variable "policy_constraints" {
   })
   default = {}
 }
+
+variable "forensics_group" {
+  description = "Member string of the organization-owned forensics group (the canonical identity class dep-forensics-readers) receiving the read-only diagnostic bindings on this zone project. Supplied by the organization instance; never carried by the core."
+  type        = string
+
+  validation {
+    condition     = can(regex("^group:dep-forensics-readers@", var.forensics_group))
+    error_message = "forensics_group must be the group member string of the canonical dep-forensics-readers identity class."
+  }
+}
+
+variable "perimeter_ingress" {
+  description = <<-EOT
+    The second, separate perimeter ingress rule of the forensics reader access
+    class: the perimeter resource name and the five zone projects the rule
+    covers. The control zone declares this boundary-level binding exactly once
+    for the whole perimeter; every other stack never carries it. All values
+    are supplied by the organization instance.
+  EOT
+  type = object({
+    perimeter_name = string
+    zone_projects  = set(string)
+  })
+
+  validation {
+    condition = (
+      can(regex("^accessPolicies/[0-9]+/servicePerimeters/[A-Za-z0-9_]+$", var.perimeter_ingress.perimeter_name))
+      && length(var.perimeter_ingress.zone_projects) > 0
+      && alltrue([for project in var.perimeter_ingress.zone_projects : can(regex("^projects/[0-9]+$", project))])
+    )
+    error_message = "perimeter_ingress must bind the full perimeter resource name and at least one zone project in the projects/<number> form."
+  }
+}

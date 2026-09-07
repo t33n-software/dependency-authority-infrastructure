@@ -60,3 +60,13 @@ module "audit_log_sink" {
     }
   }
 }
+
+# The forensics reader access class: the organization-owned forensics group
+# holds exactly the two read-only diagnostic roles on this zone project and no
+# other grant; the group is instance-bound, never a stack literal.
+module "forensics_readers" {
+  source     = "../../modules/forensics-readers"
+  project_id = var.project_id
+
+  forensics_group = var.forensics_group
+}
