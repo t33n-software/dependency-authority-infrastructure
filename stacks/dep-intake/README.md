@@ -8,7 +8,9 @@ Google Access subnetwork in the job region, the restricted-range DNS response
 policy and the egress firewall pair) and the zone's workload job of the
 in-perimeter execution substrate (`dep-intake-fetch`, executed as the intake
 fetcher identity and invoked only through its dedicated invoke-only trigger
-identity `dep-intake-fetch-trigger`).
+identity `dep-intake-fetch-trigger`). The stack additionally declares the
+read-only diagnostic bindings of the forensics reader access class on the zone
+project.
 
 ## Boundary
 
@@ -39,6 +41,10 @@ identity `dep-intake-fetch-trigger`).
 - The lane federates to the dedicated invoke-only trigger identity of the
   job, never to the execution identity; the trigger identity holds invoke on
   exactly `dep-intake-fetch` and no data-plane grant.
+- The forensics reader access class: the organization-owned forensics group
+  (instance-supplied) holds exactly `roles/logging.viewer` and
+  `roles/run.viewer` on this zone project and no other grant — the read-only
+  diagnostic bindings are declared through the forensics-readers module.
 
 ## Inputs
 
@@ -47,6 +53,7 @@ identity `dep-intake-fetch-trigger`).
 (the matrix-bound control-plane readers), `workload_job_images`
 (the instance-bound image digests keyed by canonical job name),
 `workload_network` (the instance-bound zone VPC names and CIDR),
+`forensics_group` (the instance-bound forensics reader group),
 `evidence_bucket_name`, audit sink settings and `policy_constraints`.
 
 ## Outputs

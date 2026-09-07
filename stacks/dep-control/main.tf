@@ -146,3 +146,17 @@ module "audit_log_sink" {
     }
   }
 }
+
+# The forensics reader access class: the organization-owned forensics group
+# holds exactly the two read-only diagnostic roles on this zone project and no
+# other grant. The control zone additionally declares the second, separate
+# perimeter ingress rule of the class (the forensics group as the only
+# identity, scoped to the read-only logging method on the zone projects): the
+# boundary-level binding of the class lives exactly once, here.
+module "forensics_readers" {
+  source     = "../../modules/forensics-readers"
+  project_id = var.project_id
+
+  forensics_group   = var.forensics_group
+  perimeter_ingress = var.perimeter_ingress
+}

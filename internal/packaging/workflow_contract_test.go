@@ -16,6 +16,7 @@ var moduleNames = []string{
 	"artifact-registry",
 	"cloud-run-job",
 	"evidence-archive",
+	"forensics-readers",
 	"logging",
 	"network",
 	"repository-iam",
@@ -983,8 +984,16 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 	}
 
 	// The invoke roles stay resource-scoped: no project-level Cloud Run grant
-	// exists anywhere in the core.
+	// exists anywhere in the core. The single declared exception is the
+	// forensics reader access class (the forensics-readers module): the
+	// organization-owned forensics group holds roles/run.viewer project-scoped
+	// for the execution status read-back — a standing read-only diagnostic
+	// identity, never a lane trigger identity; its exact surface is pinned
+	// fail-closed by TestStacksDeclareTheForensicsReaderAccessClass.
 	for _, path := range repositoryFiles(t, []string{".tf"}) {
+		if strings.HasSuffix(filepath.ToSlash(path), "modules/forensics-readers/main.tf") {
+			continue
+		}
 		content, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("ReadFile(%q) error = %v", path, err)
@@ -1253,6 +1262,169 @@ func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-13") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-13")
+	}
+}
+
+func TestStacksDeclareTheForensicsReaderAccessClass(t *testing.T) {
+	// The forensics-readers module owns the read-only diagnostic access class:
+	// exactly the two project-scoped read-only roles for the instance-bound
+	// forensics group and the once-declared perimeter ingress rule.
+	moduleMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "forensics-readers", "main.tf")))
+	for _, required := range []string{
+		`resource "google_project_iam_member" "log_reader"`,
+		`resource "google_project_iam_member" "execution_reader"`,
+		`role = "roles/logging.viewer"`,
+		`role = "roles/run.viewer"`,
+		`member = var.forensics_group`,
+		`resource "google_access_context_manager_service_perimeter_ingress_policy" "forensics"`,
+		`count = var.perimeter_ingress == null ? 0 : 1`,
+		`perimeter = var.perimeter_ingress.perimeter_name`,
+		`identities = [var.forensics_group]`,
+		`access_level = "*"`,
+		`resources = tolist(var.perimeter_ingress.zone_projects)`,
+		`service_name = "logging.googleapis.com"`,
+		`permission = "logging.logEntries.list"`,
+	} {
+		if !strings.Contains(moduleMain, required) {
+			t.Fatalf("modules/forensics-readers/main.tf does not declare the forensics reader access class element %q", required)
+		}
+	}
+
+	// The class is structurally read-only: the module grants exactly the two
+	// diagnostic roles and never creates identities, never binds at
+	// organization or folder level and never owns the perimeter itself.
+	if count := strings.Count(moduleMain, "roles/"); count != 2 {
+		t.Fatalf("modules/forensics-readers/main.tf carries %d role references, want exactly the two read-only diagnostic roles", count)
+	}
+	for _, forbidden := range []string{
+		"google_organization_iam",
+		"google_folder_iam",
+		"google_service_account",
+		`google_access_context_manager_service_perimeter"`,
+	} {
+		if strings.Contains(moduleMain, forbidden) {
+			t.Fatalf("modules/forensics-readers/main.tf must never contain %q; the class creates no identities, holds no organization- or folder-level grant and never owns the perimeter itself", forbidden)
+		}
+	}
+
+	moduleVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "forensics-readers", "variables.tf")))
+	for _, required := range []string{
+		`variable "forensics_group" {`,
+		`variable "perimeter_ingress" {`,
+		`default = null`,
+		`^group:dep-forensics-readers@`,
+		`^accessPolicies/[0-9]+/servicePerimeters/[A-Za-z0-9_]+$`,
+		`^projects/[0-9]+$`,
+	} {
+		if !strings.Contains(moduleVariables, required) {
+			t.Fatalf("modules/forensics-readers/variables.tf does not bind %q", required)
+		}
+	}
+	// The forensics group is an instance binding, never a module-assigned value.
+	groupStart := strings.Index(moduleVariables, `variable "forensics_group" {`)
+	if groupStart < 0 {
+		t.Fatal("modules/forensics-readers/variables.tf does not carry the forensics_group input")
+	}
+	groupSegment := moduleVariables[groupStart:]
+	if next := strings.Index(groupSegment, ` variable "`); next > 0 {
+		groupSegment = groupSegment[:next]
+	}
+	if strings.Contains(groupSegment, "default") {
+		t.Fatal("modules/forensics-readers/variables.tf carries a default for forensics_group; the forensics group is an instance binding, never a module-assigned value")
+	}
+
+	moduleOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "forensics-readers", "outputs.tf")))
+	for _, required := range []string{
+		`output "log_reader_binding_id"`,
+		`output "execution_reader_binding_id"`,
+		`output "ingress_policy_id"`,
+	} {
+		if !strings.Contains(moduleOutputs, required) {
+			t.Fatalf("modules/forensics-readers/outputs.tf does not export %q", required)
+		}
+	}
+
+	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "forensics-readers", "README.md"))
+	for _, required := range []string{"forensics reader access class", "roles/logging.viewer", "roles/run.viewer", "logging.logEntries.list", "never carries the forensics identity"} {
+		if !strings.Contains(moduleReadme, required) {
+			t.Fatalf("the forensics-readers module README does not document %q", required)
+		}
+	}
+
+	// Every zone stack binds the instance-supplied forensics group through the
+	// module; the group is required everywhere and never a stack-assigned value.
+	for _, stack := range stackNames {
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		for _, required := range []string{
+			`module "forensics_readers" {`,
+			`source = "../../modules/forensics-readers"`,
+			`forensics_group = var.forensics_group`,
+		} {
+			if !strings.Contains(main, required) {
+				t.Fatalf("stacks/%s/main.tf does not declare the forensics reader access class element %q", stack, required)
+			}
+		}
+
+		variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf")))
+		start := strings.Index(variables, `variable "forensics_group" {`)
+		if start < 0 {
+			t.Fatalf("stacks/%s/variables.tf does not carry the forensics_group input", stack)
+		}
+		segment := variables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if strings.Contains(segment, "default") {
+			t.Fatalf("stacks/%s/variables.tf carries a default for forensics_group; the forensics group is an instance binding, never a stack-assigned value", stack)
+		}
+	}
+
+	// The perimeter ingress rule is declared exactly once: the control-zone
+	// stack binds it as a required instance input; every other stack is pure
+	// and never carries the rule surface.
+	controlMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "main.tf")))
+	if !strings.Contains(controlMain, `perimeter_ingress = var.perimeter_ingress`) {
+		t.Fatal("stacks/dep-control/main.tf does not wire the forensics perimeter ingress rule")
+	}
+	controlVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tf")))
+	ingressStart := strings.Index(controlVariables, `variable "perimeter_ingress" {`)
+	if ingressStart < 0 {
+		t.Fatal("stacks/dep-control/variables.tf does not carry the perimeter_ingress input")
+	}
+	ingressSegment := controlVariables[ingressStart:]
+	if strings.Contains(ingressSegment, "default") {
+		t.Fatal("stacks/dep-control/variables.tf carries a default for perimeter_ingress; the rule is an instance binding, never a stack-assigned value")
+	}
+	for _, stack := range []string{"dep-intake", "dep-evidence", "dep-approved", "dep-quarantine"} {
+		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
+		if strings.Contains(main, "perimeter_ingress") {
+			t.Fatalf("stacks/%s must never declare the forensics perimeter ingress rule; the boundary-level binding lives exactly once in dep-control", stack)
+		}
+		variables := readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf"))
+		if strings.Contains(variables, "perimeter_ingress") {
+			t.Fatalf("stacks/%s/variables.tf must never carry perimeter_ingress; the boundary-level binding lives exactly once in dep-control", stack)
+		}
+	}
+
+	// The architecture decision record carries the forensics reader access
+	// class decision including its exclusions.
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"forensics reader access class",
+		"dep-forensics-readers",
+		"roles/logging.viewer",
+		"roles/run.viewer",
+		"logging.logEntries.list",
+		"never carries the forensics identity",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the forensics reader access class element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-14") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-14")
 	}
 }
 

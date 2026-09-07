@@ -22,7 +22,8 @@ infrastructure core.
 
 1. It owns the generic modules under `modules/`: artifact repositories,
    repository-scoped IAM, workload identity, audit logging, the evidence
-   retention archive, private DNS and time-bounded break-glass recovery. It
+   retention archive, private DNS, time-bounded break-glass recovery and the
+   forensics reader access class bindings. It
    owns the project-level organization-policy compensation under
    `policy-bindings/` and the parameterized reference stacks under `stacks/`
    for the five trust zones.
@@ -141,6 +142,27 @@ infrastructure core.
    platform enforces the form rather than convention alone. The quarantine
    and approved zones carry no workload network: they own no jobs (zone
    purity).
+10. The forensics reader access class binds the raw-substrate forensics
+    capability of the operator access classes: the organization-owned
+    forensics group (the canonical identity class `dep-forensics-readers`,
+    created and membership-managed on the organization identity plane, never
+    by this core) holds exactly `roles/logging.viewer` and `roles/run.viewer`
+    project-scoped on every zone project through the `forensics-readers`
+    module — never organization-scoped — and no other grant on any plane, so
+    the read-only form is enforced by the granted roles rather than by
+    convention. The second, separate perimeter ingress rule carries the
+    forensics group as the only identity, scoped to the read-only logging
+    method `logging.logEntries.list` with the zone projects as resources,
+    entering through the same identity-bound channel as the administration
+    rule; the administration ingress rule never carries the forensics
+    identity, and every additional read method is a governed change to the
+    rule. The execution status read-back travels the deliberately
+    non-restricted compute control plane and needs no perimeter rule. The
+    boundary-level rule is declared exactly once by the control-zone stack
+    (the boundary governance zone); every other stack binds only the zone
+    bindings of the class. The forensics group member string, the perimeter
+    resource name and the zone project numbers are instance bindings, never
+    core literals.
 
 ## Consequences
 

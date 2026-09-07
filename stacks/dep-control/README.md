@@ -10,7 +10,10 @@ restricted-range DNS response policy and the egress firewall pair) and the
 zone's four workload jobs (`dep-admission`, `dep-promotion`,
 `dep-revalidation`, `dep-revocation`), each executed as the existing zone
 workload identity of its lane and invoked only through its dedicated
-invoke-only trigger identity (`dep-<operation>-trigger`).
+invoke-only trigger identity (`dep-<operation>-trigger`). The stack also
+carries the forensics reader access class: the read-only diagnostic bindings
+on the zone project and — declared exactly once here — the second, separate
+perimeter ingress rule of the class.
 
 ## Boundary
 
@@ -48,6 +51,14 @@ invoke-only trigger identity (`dep-<operation>-trigger`).
 - Each lane federates to the dedicated invoke-only trigger identity of its
   job, never to the execution identity; a trigger identity holds invoke on
   exactly its own job and no data-plane grant.
+- The forensics reader access class: the organization-owned forensics group
+  (instance-supplied) holds exactly `roles/logging.viewer` and
+  `roles/run.viewer` on this zone project and no other grant. This stack
+  additionally declares the second, separate perimeter ingress rule of the
+  class exactly once for the whole boundary: the forensics group as the only
+  identity, scoped to the read-only logging method `logging.logEntries.list`
+  with the zone projects as resources, through the same identity-bound channel
+  as the administration rule.
 
 ## Inputs
 
@@ -55,8 +66,11 @@ invoke-only trigger identity (`dep-<operation>-trigger`).
 controller identities), `workload_job_images` (the instance-bound image
 digests keyed by canonical job name), `workload_network` (the instance-bound
 zone VPC names and CIDR), `cross_zone_workload_reader_members`
-(the matrix-bound readers of the other zones), `evidence_bucket_name`, audit
-sink settings and `policy_constraints`.
+(the matrix-bound readers of the other zones), `forensics_group` (the
+instance-bound forensics reader group), `perimeter_ingress` (the
+instance-bound perimeter rule of the forensics reader access class, declared
+exactly once here), `evidence_bucket_name`, audit sink settings and
+`policy_constraints`.
 
 ## Outputs
 

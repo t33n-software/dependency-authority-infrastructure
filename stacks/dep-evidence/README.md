@@ -10,7 +10,8 @@ pair) and the zone's workload jobs of the in-perimeter execution substrate
 (`dep-evidence-write` and `dep-evidence-audit`, executed as the writer and
 auditor identities and invoked only through their dedicated invoke-only
 trigger identities `dep-evidence-write-trigger` and
-`dep-evidence-audit-trigger`).
+`dep-evidence-audit-trigger`). The stack additionally declares the read-only
+diagnostic bindings of the forensics reader access class on the zone project.
 
 ## Boundary
 
@@ -43,6 +44,10 @@ trigger identities `dep-evidence-write-trigger` and
 - Each lane federates to the dedicated invoke-only trigger identity of its
   job, never to the execution identity; a trigger identity holds invoke on
   exactly its own job and no data-plane grant.
+- The forensics reader access class: the organization-owned forensics group
+  (instance-supplied) holds exactly `roles/logging.viewer` and
+  `roles/run.viewer` on this zone project and no other grant — the read-only
+  diagnostic bindings are declared through the forensics-readers module.
 
 ## Inputs
 
@@ -52,7 +57,8 @@ instance-bound image digests keyed by canonical job name), `workload_network`
 (the instance-bound zone VPC names and CIDR), `archive_bucket_name`,
 `retention_period_seconds`, `lock_retention_policy`,
 optional `archive_kms_key_name`, the matrix-bound `additional_writer_members`
-and `additional_auditor_members`, audit sink settings and
+and `additional_auditor_members`, `forensics_group` (the instance-bound
+forensics reader group), audit sink settings and
 `policy_constraints`.
 
 ## Outputs

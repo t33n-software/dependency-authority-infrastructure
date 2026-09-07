@@ -3,7 +3,8 @@
 Reference stack of the quarantine trust zone: standard repositories per
 ecosystem for blocked or incomplete candidates, the zone workload identity
 pool, repository-scoped writer and reader bindings, project-level policy
-compensation and the audit export into the evidence archive.
+compensation, the audit export into the evidence archive and the read-only
+diagnostic bindings of the forensics reader access class on the zone project.
 
 ## Boundary
 
@@ -15,11 +16,16 @@ compensation and the audit export into the evidence archive.
   provisions the project and its API surface first.
 - The audit export requires the dep-evidence archive bucket; provisioning
   order is dep-evidence first.
+- The forensics reader access class: the organization-owned forensics group
+  (instance-supplied) holds exactly `roles/logging.viewer` and
+  `roles/run.viewer` on this zone project and no other grant — the read-only
+  diagnostic bindings are declared through the forensics-readers module.
 
 ## Inputs
 
 `project_id`, `location`, `ecosystems` (default `["go"]`), `pool_id`,
 optional zone `identities`, `writer_members`, `reader_members`,
+`forensics_group` (the instance-bound forensics reader group),
 `evidence_bucket_name`, audit sink settings and `policy_constraints`.
 
 ## Outputs
