@@ -152,11 +152,12 @@ infrastructure core.
     the read-only form is enforced by the granted roles rather than by
     convention. The second, separate perimeter ingress rule carries the
     forensics group as the only identity, scoped to the read-only logging
-    method `logging.logEntries.list` with the zone projects as resources,
-    entering through the same identity-bound channel as the administration
-    rule; the administration ingress rule never carries the forensics
-    identity, and every additional read method is a governed change to the
-    rule. The execution status read-back travels the deliberately
+    method `LoggingServiceV2.ListLogEntries` (the platform-supported
+    method-selector form for Cloud Logging) with the zone projects as
+    resources, entering through the same identity-bound channel as the
+    administration rule; the administration ingress rule never carries the
+    forensics identity, and every additional read method is a governed
+    change to the rule. The execution status read-back travels the deliberately
     non-restricted compute control plane and needs no perimeter rule. The
     boundary-level rule is declared exactly once by the control-zone stack
     (the boundary governance zone); every other stack binds only the zone

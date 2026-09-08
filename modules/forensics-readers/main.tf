@@ -16,8 +16,9 @@ resource "google_project_iam_member" "execution_reader" {
 }
 
 # The second, separate perimeter ingress rule: the forensics group is the only
-# identity, scoped to the read-only logging method logging.logEntries.list with
-# the zone projects as resources, entering through the same identity-bound
+# identity, scoped to exactly the read-only logging method
+# LoggingServiceV2.ListLogEntries with the zone projects as resources, entering
+# through the same identity-bound
 # channel as the administration rule. The administration ingress rule never
 # carries the forensics identity, and every additional read method is a
 # governed change to this rule. The execution status read-back travels the
@@ -45,7 +46,7 @@ resource "google_access_context_manager_service_perimeter_ingress_policy" "foren
       service_name = "logging.googleapis.com"
 
       method_selectors {
-        permission = "logging.logEntries.list"
+        method = "LoggingServiceV2.ListLogEntries"
       }
     }
   }

@@ -56,9 +56,9 @@ perimeter ingress rule of the class.
   `roles/run.viewer` on this zone project and no other grant. This stack
   additionally declares the second, separate perimeter ingress rule of the
   class exactly once for the whole boundary: the forensics group as the only
-  identity, scoped to the read-only logging method `logging.logEntries.list`
-  with the zone projects as resources, through the same identity-bound channel
-  as the administration rule.
+  identity, scoped to the read-only logging method
+  `LoggingServiceV2.ListLogEntries` with the zone projects as resources,
+  through the same identity-bound channel as the administration rule.
 
 ## Inputs
 
