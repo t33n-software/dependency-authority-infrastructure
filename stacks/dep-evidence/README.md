@@ -5,7 +5,8 @@ ecosystem, the long-term immutable retention archive, the evidence writer and
 auditor workload identities, repository-scoped bindings, project-level policy
 compensation, the zone's own audit export into the archive, the zone workload
 network origin (one VPC with one Private Google Access subnetwork in the job
-region, the restricted-range DNS response policy and the egress firewall
+region, the restricted-range DNS response policy covering `*.googleapis.com`
+and the Artifact Registry data plane `*.pkg.dev`, and the egress firewall
 pair) and the zone's workload jobs of the in-perimeter execution substrate
 (`dep-evidence-write` and `dep-evidence-audit`, executed as the writer and
 auditor identities and invoked only through their dedicated invoke-only

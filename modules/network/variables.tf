@@ -41,7 +41,8 @@ variable "workload_network" {
     subnetwork in the job region carrying Private Google Access, the
     restricted-range DNS response policy (every Google API call from the zone
     VPC resolves *.googleapis.com to restricted.googleapis.com, the
-    199.36.153.4/30 range that serves only the restricted services) and the
+    199.36.153.4/30 range that serves only the restricted services, and the
+    Artifact Registry data plane *.pkg.dev resolves to the same range) and the
     egress firewall pair (allow TCP 443 to the restricted range ordered before
     priority 1000, deny all egress ordered after priority 1000). Every
     workload job of the zone attaches to this network with Direct VPC egress

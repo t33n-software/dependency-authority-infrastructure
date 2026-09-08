@@ -6,7 +6,8 @@ lanes), the zone workload identity pool, project-level policy compensation,
 the audit export into the evidence archive, the workload image registries of
 the in-perimeter execution substrate, the zone workload network origin (one
 VPC with one Private Google Access subnetwork in the job region, the
-restricted-range DNS response policy and the egress firewall pair) and the
+restricted-range DNS response policy covering `*.googleapis.com` and the
+Artifact Registry data plane `*.pkg.dev`, and the egress firewall pair) and the
 zone's four workload jobs (`dep-admission`, `dep-promotion`,
 `dep-revalidation`, `dep-revocation`), each executed as the existing zone
 workload identity of its lane and invoked only through its dedicated

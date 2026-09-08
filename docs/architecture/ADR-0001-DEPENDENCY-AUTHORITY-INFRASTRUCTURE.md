@@ -133,10 +133,16 @@ infrastructure core.
    zone-project membership of the workload does not by itself place its calls
    inside — the network origin is the third perimeter dimension beside
    identity and resource. The zone VPC carries the restricted-range DNS
-   response policy (`*.googleapis.com` resolves to `restricted.googleapis.com`,
-   `199.36.153.4/30`) and exactly two egress firewall rules (allow TCP 443 to
-   the restricted range ordered before priority 1000, deny all egress ordered
-   after priority 1000), and the project-level policy compensation restricts
+   response policy (`*.googleapis.com` and the Artifact Registry data-plane
+   domain `*.pkg.dev` resolve to `restricted.googleapis.com`,
+   `199.36.153.4/30`; the registry domains are served by the restricted VIP,
+   and without the mapping the workload's registry calls resolve to public
+   addresses and fail against the deny-all egress rule) and exactly two
+   egress firewall rules (allow TCP 443 to the restricted range ordered
+   before priority 1000, deny all egress ordered after priority 1000 — the
+   allow rule targets the restricted range rather than a domain, so it
+   already covers the data plane), and the project-level policy compensation
+   restricts
    Cloud Run to exactly this form (`run.allowedVPCEgress` allows only
    `all-traffic`, `run.allowedIngress` allows only `internal`), so the
    platform enforces the form rather than convention alone. The quarantine

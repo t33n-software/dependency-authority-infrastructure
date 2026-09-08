@@ -1102,8 +1102,9 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
 	// The network module carries the zone workload network origin surface:
 	// exactly one VPC with one Private Google Access subnetwork in the job
-	// region, the restricted-range DNS response policy and the egress firewall
-	// pair ordered around priority 1000.
+	// region, the restricted-range DNS response policy (covering the Google
+	// API calls and the Artifact Registry data plane pkg.dev) and the egress
+	// firewall pair ordered around priority 1000.
 	networkMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "network", "main.tf")))
 	for _, required := range []string{
 		`resource "google_compute_network" "workload"`,
@@ -1113,6 +1114,8 @@ func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
 		`resource "google_dns_response_policy" "workload"`,
 		`resource "google_dns_response_policy_rule" "restricted_googleapis"`,
 		`dns_name = "*.googleapis.com."`,
+		`resource "google_dns_response_policy_rule" "restricted_pkg_dev"`,
+		`dns_name = "*.pkg.dev."`,
 		`rrdatas = ["199.36.153.4", "199.36.153.5", "199.36.153.6", "199.36.153.7"]`,
 		`resource "google_compute_firewall" "allow_restricted_googleapis_egress"`,
 		`resource "google_compute_firewall" "deny_all_egress"`,
@@ -1124,6 +1127,15 @@ func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
 		if !strings.Contains(networkMain, required) {
 			t.Fatalf("modules/network/main.tf does not declare the workload network origin element %q", required)
 		}
+	}
+	// The module declares exactly the two restricted-range rules — the Google
+	// API form and the Artifact Registry data plane — and both carry the same
+	// restricted VIP record set.
+	if count := strings.Count(networkMain, `resource "google_dns_response_policy_rule"`); count != 2 {
+		t.Fatalf("modules/network/main.tf declares %d DNS response policy rules, want exactly 2 (restricted_googleapis and restricted_pkg_dev)", count)
+	}
+	if count := strings.Count(networkMain, `rrdatas = ["199.36.153.4", "199.36.153.5", "199.36.153.6", "199.36.153.7"]`); count != 2 {
+		t.Fatalf("modules/network/main.tf carries %d restricted-range record sets, want exactly 2 (the googleapis rule and the pkg.dev data-plane rule)", count)
 	}
 
 	networkVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "network", "variables.tf")))
@@ -1145,7 +1157,7 @@ func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
 	}
 
 	networkReadme := readRepositoryFile(t, filepath.Join("modules", "network", "README.md"))
-	for _, required := range []string{"workload network origin", "Private Google Access", "restricted.googleapis.com", "Direct VPC egress"} {
+	for _, required := range []string{"workload network origin", "Private Google Access", "restricted.googleapis.com", "Direct VPC egress", "pkg.dev"} {
 		if !strings.Contains(networkReadme, required) {
 			t.Fatalf("the network module README does not document %q", required)
 		}
@@ -1251,6 +1263,7 @@ func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
 		"Direct VPC egress",
 		"all-traffic",
 		"199.36.153.4/30",
+		"pkg.dev",
 		"run.allowedVPCEgress",
 		"run.allowedIngress",
 	} {
@@ -1262,6 +1275,9 @@ func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-13") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-13")
+	}
+	if !strings.Contains(traceability, "DAI-16") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-16")
 	}
 }
 
