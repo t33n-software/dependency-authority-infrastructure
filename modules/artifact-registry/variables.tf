@@ -85,6 +85,25 @@ variable "remote_upstream" {
   }
 }
 
+variable "vpcsc_upstream_allowance" {
+  description = <<-EOT
+    Whether the repository's zone operates inside a VPC Service Controls
+    perimeter and therefore declares the registry-platform upstream allowance
+    (vpcsc_policy = ALLOW) for its project and location. The default is the
+    fail-closed denied posture; a zone with a remote repository inside the
+    perimeter opts in. The allowance is scoped to the project and location and
+    covers only the configured upstreams of the remote repositories there; it
+    is never a perimeter egress rule.
+  EOT
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.vpcsc_upstream_allowance || var.mode == "REMOTE_REPOSITORY"
+    error_message = "vpcsc_upstream_allowance requires REMOTE_REPOSITORY mode; a standard repository never carries the upstream allowance."
+  }
+}
+
 variable "cleanup_policies" {
   description = <<-EOT
     Cleanup policies keyed by policy ID. Intake zones use them for short-lived

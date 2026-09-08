@@ -66,3 +66,19 @@ resource "google_artifact_registry_repository" "this" {
     }
   }
 }
+
+# The remote upstream allowance: a zone with a remote repository inside the
+# perimeter opts in. The registry platform auto-creates this zone-level
+# singleton per project and location; declaring it acquires and updates that
+# singleton, and removing it from the configuration releases the state binding
+# without mutating the platform. The pinned GA provider carries no resource
+# for this surface, so the declaration binds the exactly pinned google-beta
+# provider (docs/conventions/provider-binding/beta-stage-resources.md).
+resource "google_artifact_registry_vpcsc_config" "this" {
+  count = var.vpcsc_upstream_allowance ? 1 : 0
+
+  provider     = google-beta
+  project      = var.project_id
+  location     = var.location
+  vpcsc_policy = "ALLOW"
+}

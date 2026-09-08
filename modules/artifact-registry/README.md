@@ -15,6 +15,18 @@ GENERIC evidence repositories and DOCKER workload image repositories
 - DOCKER workload image repositories always use standard mode and never bind
   a remote upstream: the workload classes (`staging-*`, `release-*`) are
   filled through the governed producer channel and promotion, never proxied.
+- The remote upstream allowance (`google_artifact_registry_vpcsc_config`) is
+  the zone-level registry-platform form that permits a remote repository's
+  upstream fetch inside a VPC Service Controls perimeter; the platform default
+  is deny. A zone opts in through `vpcsc_upstream_allowance`, only in
+  REMOTE_REPOSITORY mode. The allowance covers only the configured upstreams
+  of the zone's remote repositories and is never a perimeter egress rule. The
+  pinned GA provider carries no resource for this surface, so the declaration
+  binds the exactly pinned `google-beta` provider (the same publisher and
+  signing trust anchor as the GA pin); the promotion path back to the GA
+  provider is a governed change once the GA provider carries the resource. The
+  standing rule lives in
+  `docs/conventions/provider-binding/beta-stage-resources.md`.
 - Revocation download rules (`google_artifact_registry_rule`) are a runtime
   operation of the revocation controller and are intentionally never created
   by this module.
