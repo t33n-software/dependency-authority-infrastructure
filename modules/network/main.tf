@@ -93,6 +93,30 @@ resource "google_dns_response_policy_rule" "restricted_googleapis" {
   }
 }
 
+# The Artifact Registry data plane: the registry domain pkg.dev is served by
+# the same restricted range, so the zone resolves *.pkg.dev to it as well.
+# Without this mapping the workload's registry calls (for example the intake
+# fetch from <region>-go.pkg.dev) resolve to public addresses and fail against
+# the deny-all egress rule; the firewall pair needs no change because its
+# allow rule targets the restricted range, not a domain.
+resource "google_dns_response_policy_rule" "restricted_pkg_dev" {
+  count = var.workload_network != null ? 1 : 0
+
+  project         = var.project_id
+  response_policy = google_dns_response_policy.workload[0].response_policy_name
+  rule_name       = "restricted-pkg-dev"
+  dns_name        = "*.pkg.dev."
+
+  local_data {
+    local_datas {
+      name    = "*.pkg.dev."
+      type    = "A"
+      ttl     = 300
+      rrdatas = ["199.36.153.4", "199.36.153.5", "199.36.153.6", "199.36.153.7"]
+    }
+  }
+}
+
 # The egress firewall pair: nothing leaves the zone VPC except TCP 443 toward
 # the restricted range. The allow rule orders before priority 1000, the
 # deny-all rule after it.

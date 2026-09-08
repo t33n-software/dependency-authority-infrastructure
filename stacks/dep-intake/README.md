@@ -5,7 +5,8 @@ ecosystem, the intake fetcher workload identity, repository-scoped writer
 binding, project-level policy compensation, the audit export into the
 evidence archive, the zone workload network origin (one VPC with one Private
 Google Access subnetwork in the job region, the restricted-range DNS response
-policy and the egress firewall pair) and the zone's workload job of the
+policy covering `*.googleapis.com` and the Artifact Registry data plane
+`*.pkg.dev`, and the egress firewall pair) and the zone's workload job of the
 in-perimeter execution substrate (`dep-intake-fetch`, executed as the intake
 fetcher identity and invoked only through its dedicated invoke-only trigger
 identity `dep-intake-fetch-trigger`). The stack additionally declares the

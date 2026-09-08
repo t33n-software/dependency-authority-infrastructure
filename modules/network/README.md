@@ -13,11 +13,16 @@ origin — the VPC substrate every workload job of the zone attaches to.
   subnetwork in the job region carrying Private Google Access, the
   restricted-range DNS response policy (`*.googleapis.com` resolves to
   `restricted.googleapis.com`, the `199.36.153.4/30` range that serves only
-  the VPC Service Controls restricted services) and the egress firewall pair
-  (allow TCP 443 to the restricted range ordered before priority 1000, deny
-  all egress ordered after priority 1000). The restricted range and the DNS
-  name are provider constants of the VPC Service Controls contract, never
-  instance values.
+  the VPC Service Controls restricted services, and the Artifact Registry
+  data plane `*.pkg.dev` resolves to the same range — the registry domains
+  are served by the restricted VIP, and without the mapping the workload's
+  registry calls resolve to public addresses and fail against the deny-all
+  egress rule) and the egress firewall pair (allow TCP 443 to the restricted
+  range ordered before priority 1000, deny all egress ordered after priority
+  1000; the allow rule targets the restricted range, not a domain, so it
+  already covers the data plane). The restricted range and the DNS names are
+  provider constants of the VPC Service Controls contract, never instance
+  values.
 - Every workload job of the zone attaches to this network and routes all
   outgoing traffic through it as Direct VPC egress with all-traffic routing
   (bound by the cloud-run-job module): a serverless job without the zone
