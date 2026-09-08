@@ -11,7 +11,9 @@ in-perimeter execution substrate (`dep-intake-fetch`, executed as the intake
 fetcher identity and invoked only through its dedicated invoke-only trigger
 identity `dep-intake-fetch-trigger`). The stack additionally declares the
 read-only diagnostic bindings of the forensics reader access class on the zone
-project.
+project and opts in to the registry-platform upstream allowance of the intake
+zone (the zone-level VPC Service Controls configuration that permits the
+remote repositories' configured upstreams; never a perimeter egress rule).
 
 ## Boundary
 
@@ -46,6 +48,13 @@ project.
   (instance-supplied) holds exactly `roles/logging.viewer` and
   `roles/run.viewer` on this zone project and no other grant — the read-only
   diagnostic bindings are declared through the forensics-readers module.
+- The remote upstream allowance: the stack opts in
+  (`vpcsc_upstream_allowance`), declaring the zone-level registry-platform
+  singleton that permits the remote repositories' configured upstreams inside
+  the perimeter. The platform default is deny; the declaration binds the
+  exactly pinned `google-beta` provider because the pinned GA provider carries
+  no resource for the surface; no other zone declares the allowance (zone
+  purity).
 
 ## Inputs
 

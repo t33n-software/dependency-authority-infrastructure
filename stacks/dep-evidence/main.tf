@@ -20,6 +20,13 @@ provider "google" {
   project = var.project_id
 }
 
+# The exactly pinned beta provider of the declaration plane: it declares only
+# what the pinned GA provider provably lacks (the remote upstream allowance);
+# everything else stays on the GA provider.
+provider "google-beta" {
+  project = var.project_id
+}
+
 module "policy_bindings" {
   source     = "../../policy-bindings"
   project_id = var.project_id

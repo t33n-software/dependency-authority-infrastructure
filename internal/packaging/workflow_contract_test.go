@@ -1451,6 +1451,134 @@ func TestStacksDeclareTheForensicsReaderAccessClass(t *testing.T) {
 	}
 }
 
+func TestStacksDeclareTheVpcscUpstreamAllowance(t *testing.T) {
+	// The artifact-registry module owns the remote upstream allowance: a
+	// null-gated opt-in surface binding the zone-level registry-platform
+	// singleton that permits a remote repository's upstream fetch inside the
+	// perimeter. The pinned GA provider carries no resource for this surface,
+	// so the declaration binds the exactly pinned google-beta provider.
+	moduleMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "main.tf")))
+	for _, required := range []string{
+		`resource "google_artifact_registry_vpcsc_config" "this"`,
+		`count = var.vpcsc_upstream_allowance ? 1 : 0`,
+		`provider = google-beta`,
+		`project = var.project_id`,
+		`location = var.location`,
+		`vpcsc_policy = "ALLOW"`,
+	} {
+		if !strings.Contains(moduleMain, required) {
+			t.Fatalf("modules/artifact-registry/main.tf does not declare the remote upstream allowance element %q", required)
+		}
+	}
+
+	moduleVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "variables.tf")))
+	for _, required := range []string{
+		`variable "vpcsc_upstream_allowance" {`,
+		`default = false`,
+		`!var.vpcsc_upstream_allowance || var.mode == "REMOTE_REPOSITORY"`,
+	} {
+		if !strings.Contains(moduleVariables, required) {
+			t.Fatalf("modules/artifact-registry/variables.tf does not bind the remote upstream allowance element %q", required)
+		}
+	}
+
+	moduleVersions := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "versions.tf")))
+	for _, required := range []string{
+		`source = "hashicorp/google-beta"`,
+		`version = "= 7.44.0"`,
+	} {
+		if !strings.Contains(moduleVersions, required) {
+			t.Fatalf("modules/artifact-registry/versions.tf does not carry the exact beta provider pin %q", required)
+		}
+	}
+
+	// The beta provider scope is fail-closed: the only beta-provider resource
+	// declaration in the core is the remote upstream allowance, and the beta
+	// pin lives exactly in the owning module and the five zone stacks that
+	// call it — nowhere else.
+	for _, path := range repositoryFiles(t, []string{".tf"}) {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%q) error = %v", path, err)
+		}
+		content := normalizeWhitespace(string(raw))
+		slashed := filepath.ToSlash(path)
+		if strings.Contains(content, "provider = google-beta") && !strings.HasSuffix(slashed, "modules/artifact-registry/main.tf") {
+			t.Fatalf("%s declares a resource against the beta provider; the beta provider scope is exactly the remote upstream allowance of the artifact-registry module", slashed)
+		}
+		if strings.Contains(content, `hashicorp/google-beta`) &&
+			!strings.HasSuffix(slashed, "modules/artifact-registry/versions.tf") &&
+			!strings.Contains(slashed, "/stacks/") {
+			t.Fatalf("%s carries the beta provider pin outside the owning module and the zone stacks", slashed)
+		}
+	}
+
+	// Every zone stack pins and configures the beta provider uniformly; only
+	// the intake stack opts in to the allowance, and every other stack never
+	// wires it (zone purity).
+	for _, stack := range stackNames {
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		if !strings.Contains(main, `provider "google-beta" {`) {
+			t.Fatalf("stacks/%s/main.tf does not configure the beta provider", stack)
+		}
+		versions := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "versions.tf")))
+		if !strings.Contains(versions, `source = "hashicorp/google-beta"`) {
+			t.Fatalf("stacks/%s/versions.tf does not pin the beta provider", stack)
+		}
+		lock := readRepositoryFile(t, filepath.Join("stacks", stack, ".terraform.lock.hcl"))
+		if !strings.Contains(lock, "hashicorp/google-beta") {
+			t.Fatalf("stacks/%s/.terraform.lock.hcl does not record the beta provider", stack)
+		}
+	}
+
+	intakeMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "main.tf")))
+	if !strings.Contains(intakeMain, "vpcsc_upstream_allowance = true") {
+		t.Fatal("stacks/dep-intake/main.tf does not opt in to the remote upstream allowance; the intake zone carries the remote repositories")
+	}
+	for _, stack := range []string{"dep-control", "dep-evidence", "dep-approved", "dep-quarantine"} {
+		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
+		if strings.Contains(main, "vpcsc_upstream_allowance") {
+			t.Fatalf("stacks/%s must never wire the remote upstream allowance; only zones with remote repositories inside the perimeter opt in", stack)
+		}
+	}
+
+	// The documentation surfaces carry the boundary: the module README, the
+	// intake stack README, the provider-binding convention, the architecture
+	// decision record and the register.
+	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "README.md"))
+	for _, required := range []string{"vpcsc_upstream_allowance", "google_artifact_registry_vpcsc_config", "google-beta", "never a perimeter egress rule"} {
+		if !strings.Contains(moduleReadme, required) {
+			t.Fatalf("the artifact-registry module README does not document %q", required)
+		}
+	}
+
+	intakeReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "README.md"))
+	for _, required := range []string{"vpcsc_upstream_allowance", "upstream allowance"} {
+		if !strings.Contains(intakeReadme, required) {
+			t.Fatalf("the dep-intake stack README does not document %q", required)
+		}
+	}
+
+	convention := readRepositoryFile(t, filepath.Join("docs", "conventions", "provider-binding", "beta-stage-resources.md"))
+	for _, required := range []string{"google_artifact_registry_vpcsc_config", "hashicorp/google-beta", "tofu providers schema", "never a perimeter egress rule", "vpcsc_upstream_allowance"} {
+		if !strings.Contains(convention, required) {
+			t.Fatalf("docs/conventions/provider-binding/beta-stage-resources.md does not carry %q", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{"hashicorp/google-beta", "google_artifact_registry_vpcsc_config", "vpcsc_upstream_allowance", "never a perimeter egress rule", "docs/conventions/provider-binding/beta-stage-resources.md"} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the dual-provider decision element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-17") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-17")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {

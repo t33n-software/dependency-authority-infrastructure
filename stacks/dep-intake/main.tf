@@ -28,6 +28,13 @@ provider "google" {
   project = var.project_id
 }
 
+# The exactly pinned beta provider of the declaration plane: it declares only
+# what the pinned GA provider provably lacks (the remote upstream allowance);
+# everything else stays on the GA provider.
+provider "google-beta" {
+  project = var.project_id
+}
+
 module "policy_bindings" {
   source     = "../../policy-bindings"
   project_id = var.project_id
@@ -65,6 +72,12 @@ module "repositories" {
   format          = upper(each.key)
   mode            = "REMOTE_REPOSITORY"
   remote_upstream = local.upstreams[each.key]
+
+  # The intake zone operates inside the perimeter and opts in to the
+  # registry-platform upstream allowance: the zone-level singleton covers
+  # exactly the configured upstreams of the zone's remote repositories and is
+  # never a perimeter egress rule.
+  vpcsc_upstream_allowance = true
 
   labels = {
     boundary  = "dependency-authority"

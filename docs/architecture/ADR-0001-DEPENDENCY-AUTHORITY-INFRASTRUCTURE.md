@@ -28,10 +28,11 @@ infrastructure core.
    `policy-bindings/` and the parameterized reference stacks under `stacks/`
    for the five trust zones.
 2. Infrastructure as code is written in HCL and executed exclusively with
-   OpenTofu. The engine and the Google provider are exactly pinned, provider
+   OpenTofu. The engine and the Google providers are exactly pinned, provider
    GPG validation is enforced everywhere, and every reference stack commits
-   its `.terraform.lock.hcl`. The decision rationale lives in
-   `docs/conventions/infrastructure-as-code/`.
+   its `.terraform.lock.hcl`. The engine decision rationale lives in the
+   shared-kernel capability-pack contract (the `opentofu@1` pack); this
+   core's provider-binding rules live in `docs/conventions/provider-binding/`.
 3. This core never contains concrete organization bindings.
    This core never contains tenant bindings.
    It contains no credentials, tokens, private keys, or authorization
@@ -170,6 +171,29 @@ infrastructure core.
     bindings of the class. The forensics group member string, the perimeter
     resource name and the zone project numbers are instance bindings, never
     core literals.
+11. The provider supply chain of the declaration plane carries exactly two
+    exactly pinned providers of the same publisher and signing trust anchor:
+    `hashicorp/google` (the generally available provider) and
+    `hashicorp/google-beta`. The beta provider is introduced for exactly one
+    proven case: the Artifact Registry VPC Service Controls configuration
+    (`google_artifact_registry_vpcsc_config`) exists only in the beta
+    provider, while the underlying API is generally available and the pinned
+    GA provider schema provably carries no resource for it (the proof is
+    produced against the pinned provider schema, never assumed). The beta
+    provider declares a resource only when the pinned GA provider provably
+    lacks it; the packaging contract binds this scope fail-closed. The
+    artifact-registry module declares the remote upstream allowance as a
+    null-gated opt-in surface (`vpcsc_upstream_allowance`, default fail-closed
+    denied, remote mode required) binding the configuration with
+    `vpcsc_policy = "ALLOW"` scoped to the project and location; only a zone
+    with a remote repository inside the perimeter opts in — canonically the
+    intake zone — and no other zone carries the allowance (zone purity). The
+    allowance is the zone-level registry-platform singleton, covers only the
+    configured upstreams of the zone's remote repositories and is never a
+    perimeter egress rule. When the GA provider carries the resource, a
+    governed change flips the provider reference and removes the beta
+    provider once its last resource is gone. The standing rule lives in
+    `docs/conventions/provider-binding/beta-stage-resources.md`.
 
 ## Consequences
 
