@@ -1283,11 +1283,18 @@ func TestStacksDeclareTheForensicsReaderAccessClass(t *testing.T) {
 		`access_level = "*"`,
 		`resources = tolist(var.perimeter_ingress.zone_projects)`,
 		`service_name = "logging.googleapis.com"`,
-		`permission = "logging.logEntries.list"`,
+		`method = "LoggingServiceV2.ListLogEntries"`,
 	} {
 		if !strings.Contains(moduleMain, required) {
 			t.Fatalf("modules/forensics-readers/main.tf does not declare the forensics reader access class element %q", required)
 		}
+	}
+
+	// Regression guard (DAI-15): for Cloud Logging the platform supports only
+	// the method form in method selectors; the permission form is rejected
+	// fail-closed and must never return to the declaration.
+	if strings.Contains(moduleMain, `permission = "logging.logEntries.list"`) {
+		t.Fatal("modules/forensics-readers/main.tf carries the permission form of the logging read scope; the platform supports only the method form LoggingServiceV2.ListLogEntries for Cloud Logging")
 	}
 
 	// The class is structurally read-only: the module grants exactly the two
@@ -1345,7 +1352,7 @@ func TestStacksDeclareTheForensicsReaderAccessClass(t *testing.T) {
 	}
 
 	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "forensics-readers", "README.md"))
-	for _, required := range []string{"forensics reader access class", "roles/logging.viewer", "roles/run.viewer", "logging.logEntries.list", "never carries the forensics identity"} {
+	for _, required := range []string{"forensics reader access class", "roles/logging.viewer", "roles/run.viewer", "LoggingServiceV2.ListLogEntries", "never carries the forensics identity"} {
 		if !strings.Contains(moduleReadme, required) {
 			t.Fatalf("the forensics-readers module README does not document %q", required)
 		}
@@ -1414,7 +1421,7 @@ func TestStacksDeclareTheForensicsReaderAccessClass(t *testing.T) {
 		"dep-forensics-readers",
 		"roles/logging.viewer",
 		"roles/run.viewer",
-		"logging.logEntries.list",
+		"LoggingServiceV2.ListLogEntries",
 		"never carries the forensics identity",
 	} {
 		if !strings.Contains(adr, required) {

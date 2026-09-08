@@ -17,9 +17,9 @@ lets the group read logs across the boundary.
 - The group is created and membership-managed on the organization identity
   plane outside this core; this module only binds its access class.
 - The perimeter ingress rule carries the forensics group as the only identity,
-  scoped to the read-only logging method `logging.logEntries.list`, with the
-  zone projects as resources, through the same identity-bound channel as the
-  administration rule; the administration ingress rule
+  scoped to the read-only logging method `LoggingServiceV2.ListLogEntries`
+  with the zone projects as resources, through the same identity-bound channel
+  as the administration rule; the administration ingress rule
   never carries the forensics identity, and every additional read method is a
   governed change to the rule.
 - The execution status read-back travels the deliberately non-restricted
