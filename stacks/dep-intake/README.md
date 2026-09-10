@@ -20,8 +20,8 @@ remote repositories' configured upstreams; never a perimeter egress rule).
 - Intake repositories are never consumer endpoints; only the intake fetcher
   writes, and no consumer identity receives access here. The only additional
   readers are the control-plane identities of the canonical IAM target matrix
-  (canonically the admission and promotion lanes), wired through the
-  instance-supplied member input.
+  (canonically the admission, revalidation and promotion lanes), wired through
+  the instance-supplied member input.
 - Go remote intake maps to `common_repository.uri = "https://proxy.golang.org"`;
   npm and python map to their public upstream enums. Private Go modules never
   enter through this remote repository; they require the separately governed
