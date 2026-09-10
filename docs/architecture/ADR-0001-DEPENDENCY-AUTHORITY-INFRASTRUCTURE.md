@@ -77,9 +77,13 @@ infrastructure core.
                                           *-dependencies-evidence;
                                           writer on *-dependencies-approved;
                                           reader on release-controller-images
-   dep-revalidation-controller  control   reader on *-dependencies-approved;
-                                          writer on *-dependencies-evidence;
-                                          reader on release-controller-images
+   dep-revalidation-controller  control   reader on *-dependencies-intake (the
+                                           revalidation lane materializes the
+                                           candidate content from the
+                                           controlled intake boundary) and
+                                           *-dependencies-approved;
+                                           writer on *-dependencies-evidence;
+                                           reader on release-controller-images
    dep-revocation-controller    control   writer on *-dependencies-approved
                                           (the revocation download rules stay
                                           runtime operations) and

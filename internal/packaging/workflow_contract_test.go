@@ -693,8 +693,8 @@ func TestStacksDeclareTheCompleteWorkloadJobTopology(t *testing.T) {
 
 func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	// Intake: the fetcher is the only writer; the matrix readers (canonically
-	// the admission and promotion controllers of the control zone) arrive
-	// through the instance-wired member input.
+	// the admission, revalidation and promotion controllers of the control
+	// zone) arrive through the instance-wired member input.
 	intakeMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "main.tf")))
 	for _, required := range []string{
 		`writers = ["serviceAccount:${module.workload_identity.service_account_emails["fetcher"]}"]`,
@@ -828,6 +828,7 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 		"dep-admission-controller",
 		"dep-approved-promoter",
 		"dep-revalidation-controller",
+		"dep-revalidation-controller control reader on *-dependencies-intake",
 		"dep-revocation-controller",
 		"dep-evidence-writer",
 		"dep-evidence-auditor",
