@@ -73,10 +73,13 @@ infrastructure core.
    dep-admission-controller     control   reader on *-dependencies-intake;
                                           writer on *-dependencies-evidence;
                                           reader on release-controller-images
-   dep-approved-promoter        control   reader on *-dependencies-intake and
-                                          *-dependencies-evidence;
-                                          writer on *-dependencies-approved;
-                                          reader on release-controller-images
+   dep-approved-promoter        control   reader on *-dependencies-intake;
+                                           writer on *-dependencies-approved
+                                           and *-dependencies-evidence (the
+                                           promotion writes its approved
+                                           record into the evidence
+                                           repository);
+                                           reader on release-controller-images
    dep-revalidation-controller  control   reader on *-dependencies-intake (the
                                            revalidation lane materializes the
                                            candidate content from the
