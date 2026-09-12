@@ -710,9 +710,8 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	}
 
 	// Evidence: the writer appends; the matrix writers (canonically the
-	// admission, revalidation and revocation controllers of the control zone)
-	// and the matrix reader (the approved promoter) arrive through the member
-	// inputs.
+	// admission, revalidation, revocation and promotion controllers of the
+	// control zone) arrive through the member inputs.
 	evidenceMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "main.tf")))
 	for _, required := range []string{
 		`["serviceAccount:${module.workload_identity.service_account_emails["writer"]}"]`,
@@ -729,6 +728,23 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	}
 	if !strings.Contains(evidenceVariables, "intake fetcher") {
 		t.Fatal("stacks/dep-evidence/variables.tf does not name the intake fetcher as a canonical evidence writer; the intake use case writes its candidate records into the evidence repository")
+	}
+	if !strings.Contains(evidenceVariables, "admission, revalidation, revocation and promotion controllers") {
+		t.Fatal("stacks/dep-evidence/variables.tf does not name the promotion controller as a canonical evidence writer; the promotion writes its approved record into the evidence repository")
+	}
+	// The retired form: the promoter was the canonical additional evidence
+	// reader; the promotion now writes its approved record itself, so the
+	// auditor input never names the promoter as the canonical reader.
+	auditorStart := strings.Index(evidenceVariables, `variable "additional_auditor_members" {`)
+	if auditorStart < 0 {
+		t.Fatal("stacks/dep-evidence/variables.tf does not carry the additional_auditor_members input")
+	}
+	auditorSegment := evidenceVariables[auditorStart:]
+	if next := strings.Index(auditorSegment, ` variable "`); next > 0 {
+		auditorSegment = auditorSegment[:next]
+	}
+	if strings.Contains(auditorSegment, "promoter") {
+		t.Fatal("stacks/dep-evidence/variables.tf still names the approved promoter as a canonical evidence reader; the promotion writes its approved record into the evidence repository through the writer grant")
 	}
 
 	// Approved: no zone-local workload identity; the promotion and revocation
@@ -835,10 +851,14 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 		"dep-break-glass-recovery",
 		"release-controller-images",
 		"no data-plane grant",
+		"dep-approved-promoter control reader on *-dependencies-intake; writer on *-dependencies-approved and *-dependencies-evidence (the promotion writes its approved record into the evidence repository); reader on release-controller-images",
 	} {
 		if !strings.Contains(adr, required) {
 			t.Fatalf("ADR-0001 does not carry the canonical IAM target matrix element %q", required)
 		}
+	}
+	if strings.Contains(adr, "dep-approved-promoter control reader on *-dependencies-intake and *-dependencies-evidence") {
+		t.Fatal("ADR-0001 carries the retired promoter reader form on the evidence repository; the promotion writes its approved record into the evidence repository")
 	}
 
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))

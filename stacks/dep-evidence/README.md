@@ -20,8 +20,9 @@ diagnostic bindings of the forensics reader access class on the zone project.
   identity receives routine delete authority. The only additional writers and
   readers are the identities of the canonical IAM target matrix (canonically
   the intake fetcher writing its candidate records, the admission,
-  revalidation and revocation lanes writing, the promotion lane reading),
-  wired through the instance-supplied member inputs.
+  revalidation, revocation and promotion lanes writing — the promotion lane
+  writes its approved record into the evidence repository), wired through the
+  instance-supplied member inputs.
 - The retention archive pairs the operational evidence repositories; a
   deletable repository version alone is not a long-term evidence control.
 - `lock_retention_policy` stays `false` until the retention and legal-hold

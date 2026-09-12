@@ -26,6 +26,8 @@
 
 | DAI-18 | Declare the revalidation controller's intake read in the canonical IAM target matrix: the revalidation lane materializes the candidate content from the controlled intake boundary (the module archive fetch proven against the recorded candidate digest), so the matrix binds the revalidation controller as a canonical reader of the intake repositories beside the admission controller and the approved promoter; the dep-intake reference stack documents the extended canonical reader set in the member input and its README; the architecture decision record carries the extended matrix row with its reason; and the packaging contract guard binds the new matrix row fail-closed. | In progress |
 
+| DAI-19 | Bind the approved promoter's evidence write in the canonical IAM target matrix: the promotion lane writes its approved record into the evidence repository itself (the evidence-writer boundary — a lane never externalizes its domain evidence), so the matrix binds the approved promoter as a canonical writer of the evidence repositories beside the admission, revalidation and revocation controllers and the intake fetcher, replacing the retired canonical reader form (the writer role already carries the read capability); the dep-evidence reference stack documents the extended canonical writer set in the member input and its README; the architecture decision record carries the corrected matrix row with its reason; and the packaging contract guard binds the new writer row fail-closed and forbids the retired reader form. | In progress |
+
 ## Scope boundaries
 
 - DAI-1 delivers the organization-agnostic source core only. It does not

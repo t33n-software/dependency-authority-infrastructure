@@ -115,13 +115,13 @@ variable "archive_kms_key_name" {
 }
 
 variable "additional_writer_members" {
-  description = "Members receiving write access on the evidence repositories beyond the writer identity — canonically the intake fetcher (the intake use case writes its candidate records into the evidence repository) and the admission, revalidation and revocation controllers of the control zone, as bound by the canonical IAM target matrix. Wired by the organization instance; evidence writes stay append-focused and never carry routine delete authority."
+  description = "Members receiving write access on the evidence repositories beyond the writer identity — canonically the intake fetcher (the intake use case writes its candidate records into the evidence repository) and the admission, revalidation, revocation and promotion controllers of the control zone (the promotion writes its approved record into the evidence repository), as bound by the canonical IAM target matrix. Wired by the organization instance; evidence writes stay append-focused and never carry routine delete authority."
   type        = set(string)
   default     = []
 }
 
 variable "additional_auditor_members" {
-  description = "Additional read-only auditor members of the evidence repositories beyond the auditor identity — canonically the approved promoter of the control zone for verified evidence reads before promotion, as bound by the canonical IAM target matrix. Defaults to none."
+  description = "Additional read-only auditor members of the evidence repositories beyond the auditor identity, as bound by the canonical IAM target matrix. Defaults to none."
   type        = set(string)
   default     = []
 }
