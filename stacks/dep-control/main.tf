@@ -30,6 +30,10 @@ locals {
       identity_key = "revocation"
       trigger_id   = "dep-revocation-trigger"
     }
+    "dep-consumer-verification" = {
+      identity_key = "consumer-verification"
+      trigger_id   = "dep-consumer-verification-trigger"
+    }
   }
 
   # The invoke-only trigger identity of each controller lane, keyed by the

@@ -57,7 +57,7 @@ infrastructure core.
    runtime, and schema version pins for policies and evidence. Instances wire
    the concrete project IDs, regions, OIDC bindings, members and retention
    values as reviewed instance configuration.
-7. The canonical IAM target matrix binds the data-plane roles of the eight
+7. The canonical IAM target matrix binds the data-plane roles of the nine
    zone workload identities at repository scope through
    `modules/repository-iam`, never at project scope, and cross-zone
    authority only through the owning zone's instance-wired member inputs:
@@ -88,10 +88,18 @@ infrastructure core.
                                            writer on *-dependencies-evidence;
                                            reader on release-controller-images
    dep-revocation-controller    control   writer on *-dependencies-approved
-                                          (the revocation download rules stay
-                                          runtime operations) and
-                                          *-dependencies-evidence;
-                                          reader on release-controller-images
+                                           (the revocation download rules stay
+                                           runtime operations) and
+                                           *-dependencies-evidence;
+                                           reader on release-controller-images
+   dep-consumer-verifier        control   reader on *-dependencies-approved
+                                           (the consumer read path of the
+                                           consumer verification lane);
+                                           writer on *-dependencies-evidence
+                                           (the consumer verification writes
+                                           its lane evidence into the evidence
+                                           repository);
+                                           reader on release-controller-images
    dep-evidence-writer          evidence  writer on *-dependencies-evidence;
                                           reader on release-controller-images
    dep-evidence-auditor         evidence  reader on *-dependencies-evidence;

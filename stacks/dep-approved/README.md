@@ -11,9 +11,11 @@ bindings of the forensics reader access class on the zone project.
 
 - Approved repositories are the only dependency consumer endpoints; write
   access is bound to the control-zone promoter and revocation controller
-  identities and read access to consumers and the control-zone revalidation
-  controller, all through the instance-supplied member inputs of the
-  canonical IAM target matrix. The stack creates no zone-local workload
+  identities and read access to consumers (canonically including the
+  control-zone consumer verification controller, which reads the approved
+  endpoint as a consumer of the consumer verification lane) and the
+  control-zone revalidation controller, all through the instance-supplied
+  member inputs of the canonical IAM target matrix. The stack creates no zone-local workload
   identity by default (the zone pool is created without providers); any
   future zone-local identity is a governed change.
 - Revocation is enforced at runtime through Artifact Registry download rules

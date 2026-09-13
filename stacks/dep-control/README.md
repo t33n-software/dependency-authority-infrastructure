@@ -1,17 +1,18 @@
 # Stack: dep-control
 
 Reference stack of the control trust zone: the control-plane controller
-workload identities (admission, promotion, revalidation and revocation
-lanes), the zone workload identity pool, project-level policy compensation,
-the audit export into the evidence archive, the workload image registries of
-the in-perimeter execution substrate, the zone workload network origin (one
-VPC with one Private Google Access subnetwork in the job region, the
-restricted-range DNS response policy covering `*.googleapis.com` and the
-Artifact Registry data plane `*.pkg.dev`, and the egress firewall pair) and the
-zone's four workload jobs (`dep-admission`, `dep-promotion`,
-`dep-revalidation`, `dep-revocation`), each executed as the existing zone
-workload identity of its lane and invoked only through its dedicated
-invoke-only trigger identity (`dep-<operation>-trigger`). The stack also
+workload identities (admission, promotion, revalidation, revocation and
+consumer-verification lanes), the zone workload identity pool, project-level
+policy compensation, the audit export into the evidence archive, the workload
+image registries of the in-perimeter execution substrate, the zone workload
+network origin (one VPC with one Private Google Access subnetwork in the job
+region, the restricted-range DNS response policy covering `*.googleapis.com`
+and the Artifact Registry data plane `*.pkg.dev`, and the egress firewall
+pair) and the zone's five workload jobs (`dep-admission`, `dep-promotion`,
+`dep-revalidation`, `dep-revocation`, `dep-consumer-verification`), each
+executed as the existing zone workload identity of its lane and invoked only
+through its dedicated invoke-only trigger identity
+(`dep-<operation>-trigger`). The stack also
 carries the forensics reader access class: the read-only diagnostic bindings
 on the zone project and — declared exactly once here — the second, separate
 perimeter ingress rule of the class.
@@ -30,7 +31,7 @@ perimeter ingress rule of the class.
   quarantine, approved and evidence zones through those zones' member inputs;
   cross-zone authority is never granted project-wide here.
 - The canonical IAM target matrix of the workload image registries: every
-  zone lane identity (the four control-plane lanes here, the other zones
+  zone lane identity (the five control-plane lanes here, the other zones
   through the instance-supplied member input) receives read access on the
   release class; no identity ever receives a writer grant on either class,
   and the staging class carries no binding at all.
