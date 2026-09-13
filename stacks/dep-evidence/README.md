@@ -21,7 +21,8 @@ diagnostic bindings of the forensics reader access class on the zone project.
   readers are the identities of the canonical IAM target matrix (canonically
   the intake fetcher writing its candidate records, the admission,
   revalidation, revocation and promotion lanes writing — the promotion lane
-  writes its approved record into the evidence repository), wired through the
+  writes its approved record into the evidence repository — and the consumer
+  verification lane writing its lane evidence), wired through the
   instance-supplied member inputs.
 - The retention archive pairs the operational evidence repositories; a
   deletable repository version alone is not a long-term evidence control.

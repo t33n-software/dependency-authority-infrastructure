@@ -621,10 +621,11 @@ func TestStacksDeclareTheCompleteWorkloadJobTopology(t *testing.T) {
 			"dep-intake-fetch": "fetcher",
 		},
 		"dep-control": {
-			"dep-admission":    "admission",
-			"dep-promotion":    "promotion",
-			"dep-revalidation": "revalidation",
-			"dep-revocation":   "revocation",
+			"dep-admission":             "admission",
+			"dep-promotion":             "promotion",
+			"dep-revalidation":          "revalidation",
+			"dep-revocation":            "revocation",
+			"dep-consumer-verification": "consumer-verification",
 		},
 		"dep-evidence": {
 			"dep-evidence-write": "writer",
@@ -673,8 +674,8 @@ func TestStacksDeclareTheCompleteWorkloadJobTopology(t *testing.T) {
 			t.Fatalf("stacks/%s/outputs.tf does not export the workload job IDs", stack)
 		}
 	}
-	if declared != 7 {
-		t.Fatalf("the stacks declare %d workload jobs, want the complete canonical topology of 7", declared)
+	if declared != 8 {
+		t.Fatalf("the stacks declare %d workload jobs, want the complete canonical topology of 8", declared)
 	}
 
 	// Zone purity: the quarantine and approved zones never carry workload jobs.
@@ -688,6 +689,9 @@ func TestStacksDeclareTheCompleteWorkloadJobTopology(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-10") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-10")
+	}
+	if !strings.Contains(traceability, "DAI-20") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-20")
 	}
 }
 
@@ -710,8 +714,8 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	}
 
 	// Evidence: the writer appends; the matrix writers (canonically the
-	// admission, revalidation, revocation and promotion controllers of the
-	// control zone) arrive through the member inputs.
+	// admission, revalidation, revocation, promotion and consumer verification
+	// controllers of the control zone) arrive through the member inputs.
 	evidenceMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "main.tf")))
 	for _, required := range []string{
 		`["serviceAccount:${module.workload_identity.service_account_emails["writer"]}"]`,
@@ -732,6 +736,9 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	if !strings.Contains(evidenceVariables, "admission, revalidation, revocation and promotion controllers") {
 		t.Fatal("stacks/dep-evidence/variables.tf does not name the promotion controller as a canonical evidence writer; the promotion writes its approved record into the evidence repository")
 	}
+	if !strings.Contains(evidenceVariables, "consumer verification controller") {
+		t.Fatal("stacks/dep-evidence/variables.tf does not name the consumer verification controller as a canonical evidence writer; the consumer verification writes its lane evidence into the evidence repository")
+	}
 	// The retired form: the promoter was the canonical additional evidence
 	// reader; the promotion now writes its approved record itself, so the
 	// auditor input never names the promoter as the canonical reader.
@@ -748,8 +755,8 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	}
 
 	// Approved: no zone-local workload identity; the promotion and revocation
-	// writes and the revalidation read are control-zone members bound through
-	// the member inputs.
+	// writes and the revalidation and consumer verification reads are
+	// control-zone members bound through the member inputs.
 	approvedVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-approved", "variables.tf")))
 	if strings.Contains(approvedVariables, `variable "promoter" {`) {
 		t.Fatal("stacks/dep-approved/variables.tf still declares a zone-local promoter identity; the approved promoter is a control-zone identity")
@@ -773,6 +780,9 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 		if !strings.Contains(approvedVariables, required) {
 			t.Fatalf("stacks/dep-approved/variables.tf does not carry %q", required)
 		}
+	}
+	if !strings.Contains(approvedVariables, "consumer verification controller") {
+		t.Fatal("stacks/dep-approved/variables.tf does not name the consumer verification controller as a canonical consumer reader of the approved repositories")
 	}
 
 	approvedMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-approved", "main.tf")))
@@ -852,6 +862,9 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 		"release-controller-images",
 		"no data-plane grant",
 		"dep-approved-promoter control reader on *-dependencies-intake; writer on *-dependencies-approved and *-dependencies-evidence (the promotion writes its approved record into the evidence repository); reader on release-controller-images",
+		"dep-consumer-verifier",
+		"dep-consumer-verifier control reader on *-dependencies-approved",
+		"writer on *-dependencies-evidence (the consumer verification writes its lane evidence into the evidence repository); reader on release-controller-images",
 	} {
 		if !strings.Contains(adr, required) {
 			t.Fatalf("ADR-0001 does not carry the canonical IAM target matrix element %q", required)
@@ -865,6 +878,9 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 	if !strings.Contains(traceability, "DAI-11") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-11")
 	}
+	if !strings.Contains(traceability, "DAI-20") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-20")
+	}
 }
 
 func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
@@ -875,10 +891,11 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 			"dep-intake-fetch": "dep-intake-fetch-trigger",
 		},
 		"dep-control": {
-			"dep-admission":    "dep-admission-trigger",
-			"dep-promotion":    "dep-promotion-trigger",
-			"dep-revalidation": "dep-revalidation-trigger",
-			"dep-revocation":   "dep-revocation-trigger",
+			"dep-admission":             "dep-admission-trigger",
+			"dep-promotion":             "dep-promotion-trigger",
+			"dep-revalidation":          "dep-revalidation-trigger",
+			"dep-revocation":            "dep-revocation-trigger",
+			"dep-consumer-verification": "dep-consumer-verification-trigger",
 		},
 		"dep-evidence": {
 			"dep-evidence-write": "dep-evidence-write-trigger",
@@ -905,8 +922,8 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 			t.Fatalf("stacks/%s/main.tf references the trigger identities outside the job invoker binding", stack)
 		}
 	}
-	if declared != 7 {
-		t.Fatalf("the stacks declare %d trigger identities, want the complete canonical set of 7", declared)
+	if declared != 8 {
+		t.Fatalf("the stacks declare %d trigger identities, want the complete canonical set of 8", declared)
 	}
 
 	// The identity wiring injects the canonical trigger identity into every
@@ -1117,6 +1134,9 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-12") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-12")
+	}
+	if !strings.Contains(traceability, "DAI-20") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-20")
 	}
 }
 

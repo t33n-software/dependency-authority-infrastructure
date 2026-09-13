@@ -88,7 +88,7 @@ variable "revalidation_reader_member" {
 }
 
 variable "consumer_members" {
-  description = "Read-only consumer members of the approved repositories (developer, CI, builder and release identities). Wired by the organization instance; intake and quarantine identities never appear here."
+  description = "Read-only consumer members of the approved repositories (developer, CI, builder and release identities) — canonically including the consumer verification controller of the control zone, which reads the approved endpoint as a consumer of the consumer verification lane, as bound by the canonical IAM target matrix. Wired by the organization instance; intake and quarantine identities never appear here."
   type        = set(string)
   default     = []
 }
