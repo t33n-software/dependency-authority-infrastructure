@@ -21,6 +21,7 @@ var moduleNames = []string{
 	"network",
 	"repository-iam",
 	"recovery",
+	"state-home",
 	"workload-identity",
 }
 
@@ -30,6 +31,14 @@ var stackNames = []string{
 	"dep-intake",
 	"dep-approved",
 	"dep-quarantine",
+}
+
+// stateHomeRootNames are the minimal state-home roots — one per trust zone —
+// a distinct root class from the zone stacks: they carry the zone state
+// bucket, its operator data-plane IAM and the encryption binding, and none of
+// the zone workload surfaces.
+var stateHomeRootNames = []string{
+	"dep-control-state",
 }
 
 // bindingManifest mirrors the tenant binding manifest (repo-bindings/v1) for
@@ -271,7 +280,7 @@ func TestModuleAndStackLayoutIsComplete(t *testing.T) {
 			t.Fatalf("missing policy-bindings file %q: %v", path, err)
 		}
 	}
-	for _, stack := range stackNames {
+	for _, stack := range append(slices.Clone(stackNames), stateHomeRootNames...) {
 		for _, file := range append(moduleFiles, ".terraform.lock.hcl") {
 			path := repositoryPath("stacks", stack, file)
 			if _, err := os.Stat(path); err != nil {
@@ -352,8 +361,8 @@ func TestCoreContainsNoConcreteBindings(t *testing.T) {
 
 func TestOpenTofuPinsAreExactAndConsistent(t *testing.T) {
 	for _, root := range append(
-		append([]string{"policy-bindings"}, modulePaths()...),
-		stackPaths()...,
+		append(append([]string{"policy-bindings"}, modulePaths()...), stackPaths()...),
+		stateHomeRootPaths()...,
 	) {
 		versions := normalizeWhitespace(readRepositoryFile(t, filepath.Join(root, "versions.tf")))
 		for _, required := range []string{
@@ -372,7 +381,7 @@ func TestOpenTofuPinsAreExactAndConsistent(t *testing.T) {
 		}
 	}
 
-	for _, stack := range stackNames {
+	for _, stack := range append(slices.Clone(stackNames), stateHomeRootNames...) {
 		lock := readRepositoryFile(t, filepath.Join("stacks", stack, ".terraform.lock.hcl"))
 		for _, required := range []string{"hashicorp/google", "7.44.0"} {
 			if !strings.Contains(lock, required) {
@@ -1620,6 +1629,180 @@ func TestStacksDeclareTheVpcscUpstreamAllowance(t *testing.T) {
 	}
 }
 
+func TestStateHomeRootBindsTheDualFortressForm(t *testing.T) {
+	// The state-home module owns the dedicated zone state bucket: object
+	// versioning, uniform bucket-level access, enforced public access
+	// prevention and the mandatory bucket CMEK of the dual fortress provider
+	// layer — never a retention policy, because the state layer is the
+	// recovery root, not an archive.
+	moduleMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "state-home", "main.tf")))
+	for _, required := range []string{
+		`resource "google_storage_bucket" "this"`,
+		`uniform_bucket_level_access = true`,
+		`public_access_prevention = "enforced"`,
+		`versioning {`,
+		`enabled = true`,
+		`encryption {`,
+		`default_kms_key_name = var.cmek_key_name`,
+		`resource "google_storage_bucket_iam_member" "operators"`,
+		`for_each = var.operator_members`,
+		`bucket = google_storage_bucket.this.name`,
+		`role = "roles/storage.objectAdmin"`,
+	} {
+		if !strings.Contains(moduleMain, required) {
+			t.Fatalf("modules/state-home/main.tf does not declare the state-home element %q", required)
+		}
+	}
+	for _, forbidden := range []string{"retention_policy", "roles/storage.admin", "roles/storage.objectViewer", "roles/storage.legacy"} {
+		if strings.Contains(moduleMain, forbidden) {
+			t.Fatalf("modules/state-home/main.tf must never contain %q; the state home carries exactly the object-admin data plane and no retention surface", forbidden)
+		}
+	}
+	if count := strings.Count(moduleMain, "roles/"); count != 1 {
+		t.Fatalf("modules/state-home/main.tf carries %d role references, want exactly roles/storage.objectAdmin", count)
+	}
+
+	moduleVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "state-home", "variables.tf")))
+	for _, required := range []string{
+		`variable "cmek_key_name" {`,
+		`variable "operator_members" {`,
+		`^projects/[^/]+/locations/[^/]+/keyRings/[^/]+/cryptoKeys/[^/]+$`,
+		`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`,
+	} {
+		if !strings.Contains(moduleVariables, required) {
+			t.Fatalf("modules/state-home/variables.tf does not bind %q", required)
+		}
+	}
+	// The CMEK key and the bucket name are mandatory: the state home never
+	// exists without the provider layer, so neither input carries a default.
+	for _, name := range []string{"name", "cmek_key_name"} {
+		start := strings.Index(moduleVariables, `variable "`+name+`" {`)
+		if start < 0 {
+			t.Fatalf("modules/state-home/variables.tf does not carry the %s input", name)
+		}
+		segment := moduleVariables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if strings.Contains(segment, "default") {
+			t.Fatalf("modules/state-home/variables.tf carries a default for %s; the value is a mandatory instance binding, never a default", name)
+		}
+	}
+
+	// The stack binds the engine layer of the dual fortress form and the
+	// backend into the zone state home with the state-key grammar.
+	stackVersions := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control-state", "versions.tf")))
+	for _, required := range []string{
+		`backend "gcs" {`,
+		`bucket = var.state_bucket_name`,
+		`prefix = "dep-control-state"`,
+		`encryption {`,
+		`key_provider "gcp_kms" "main"`,
+		`kms_encryption_key = var.state_encryption_key`,
+		`key_length = 32`,
+		`encrypted_metadata_alias = "state-encryption"`,
+		`method "aes_gcm" "main"`,
+		`keys = key_provider.gcp_kms.main`,
+		`state {`,
+		`plan {`,
+		`method = method.aes_gcm.main`,
+		`enforced = true`,
+		`remote_state_data_sources {`,
+		`default {`,
+	} {
+		if !strings.Contains(stackVersions, required) {
+			t.Fatalf("stacks/dep-control-state/versions.tf does not bind the dual fortress element %q", required)
+		}
+	}
+	if count := strings.Count(stackVersions, "enforced = true"); count != 2 {
+		t.Fatalf("stacks/dep-control-state/versions.tf carries %d fail-closed enforcements, want exactly 2 (state and plan)", count)
+	}
+
+	stackVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control-state", "variables.tf")))
+	for _, required := range []string{
+		`variable "state_bucket_name" {`,
+		`variable "state_encryption_key" {`,
+		`variable "state_bucket_cmek_key" {`,
+		`var.state_bucket_cmek_key != var.state_encryption_key`,
+		`element(split("/", var.state_bucket_cmek_key), 3) == var.location`,
+	} {
+		if !strings.Contains(stackVariables, required) {
+			t.Fatalf("stacks/dep-control-state/variables.tf does not bind %q", required)
+		}
+	}
+	// The bucket name and both key references are instance bindings without
+	// defaults; the two keys are cryptographically disjoint and the CMEK key
+	// ring is location-coupled to the bucket, all proven fail-closed.
+	for _, name := range []string{"state_bucket_name", "state_encryption_key", "state_bucket_cmek_key"} {
+		start := strings.Index(stackVariables, `variable "`+name+`" {`)
+		if start < 0 {
+			t.Fatalf("stacks/dep-control-state/variables.tf does not carry the %s input", name)
+		}
+		segment := stackVariables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if strings.Contains(segment, "default") {
+			t.Fatalf("stacks/dep-control-state/variables.tf carries a default for %s; the value is an instance binding, never a default", name)
+		}
+	}
+
+	stackMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control-state", "main.tf")))
+	for _, required := range []string{
+		`module "state_home" {`,
+		`source = "../../modules/state-home"`,
+		`name = var.state_bucket_name`,
+		`cmek_key_name = var.state_bucket_cmek_key`,
+		`operator_members = var.operator_members`,
+		`boundary = "dependency-authority"`,
+		`zone = "control"`,
+	} {
+		if !strings.Contains(stackMain, required) {
+			t.Fatalf("stacks/dep-control-state/main.tf does not wire %q", required)
+		}
+	}
+
+	// The state-home root is its own root class: it declares no zone workload
+	// surface, no policy compensation and no forensics binding — those stay
+	// with the zone stacks.
+	for _, forbidden := range []string{"workload_jobs", "forensics", "policy_bindings", "vpcsc"} {
+		if strings.Contains(stackMain, forbidden) {
+			t.Fatalf("stacks/dep-control-state/main.tf must never reference %q; the state-home root is minimal", forbidden)
+		}
+	}
+
+	// The documentation surfaces carry the state-home form.
+	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "state-home", "README.md"))
+	for _, required := range []string{"state home", "roles/storage.objectAdmin", "retention", "CMEK"} {
+		if !strings.Contains(moduleReadme, required) {
+			t.Fatalf("the state-home module README does not document %q", required)
+		}
+	}
+	stackReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-control-state", "README.md"))
+	for _, required := range []string{"state home", "encrypted from birth", "init -migrate-state", "dep-control-state"} {
+		if !strings.Contains(stackReadme, required) {
+			t.Fatalf("the dep-control-state stack README does not document %q", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"state home",
+		"dep-control-state",
+		"dual fortress",
+		"roles/storage.objectAdmin",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the state-home decision element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-21") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-21")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {
@@ -1632,6 +1815,14 @@ func stackPaths() []string {
 	paths := make([]string, 0, len(stackNames))
 	for _, stack := range stackNames {
 		paths = append(paths, filepath.Join("stacks", stack))
+	}
+	return paths
+}
+
+func stateHomeRootPaths() []string {
+	paths := make([]string, 0, len(stateHomeRootNames))
+	for _, root := range stateHomeRootNames {
+		paths = append(paths, filepath.Join("stacks", root))
 	}
 	return paths
 }

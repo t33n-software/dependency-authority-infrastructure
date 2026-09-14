@@ -16,8 +16,8 @@ The core owns:
 - the generic modules under `modules/` for artifact repositories,
   repository-scoped IAM, workload identity, audit logging, the evidence
   archive, the workload jobs of the in-perimeter execution substrate,
-  private DNS and the zone workload network origin, and time-bounded
-  break-glass recovery;
+  private DNS and the zone workload network origin, the zone state homes,
+  and time-bounded break-glass recovery;
 - the project-level organization-policy compensation under
   `policy-bindings/`;
 - the parameterized reference stacks under `stacks/` for the five trust
@@ -73,9 +73,10 @@ disclosed vulnerabilities fail closed even without source changes.
 
 ## Repository layout
 
-- `modules/` contains the eight generic modules.
+- `modules/` contains the nine generic modules.
 - `policy-bindings/` contains the project-level policy module.
-- `stacks/` contains the five trust-zone reference stacks.
+- `stacks/` contains the five trust-zone reference stacks plus the minimal
+  state-home roots (one per zone, starting with `dep-control-state`).
 - `internal/packaging/` contains the same-package workflow contract tests.
 - `docs/` contains architecture, conventions, and development
   documentation.
