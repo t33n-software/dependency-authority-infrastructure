@@ -61,6 +61,13 @@ perimeter ingress rule of the class.
   identity, scoped to the read-only logging method
   `LoggingServiceV2.ListLogEntries` with the zone projects as resources,
   through the same identity-bound channel as the administration rule.
+- The stack consumes the zone state home — the dedicated state bucket of the
+  zone holding that zone's root states and nothing else — through the final
+  `gcs` backend binding with the state-key grammar prefix identifying exactly
+  this root; the bucket is provisioned by the converged foundation, never by
+  this stack and never by hand, and every state and plan artifact of this
+  root is client-side encrypted through the engine layer of the dual
+  fortress state-encryption standard, fail-closed enforced.
 
 ## Inputs
 
@@ -71,7 +78,10 @@ zone VPC names and CIDR), `cross_zone_workload_reader_members`
 (the matrix-bound readers of the other zones), `forensics_group` (the
 instance-bound forensics reader group), `perimeter_ingress` (the
 instance-bound perimeter rule of the forensics reader access class, declared
-exactly once here), `evidence_bucket_name`, audit sink settings and
+exactly once here), `evidence_bucket_name`, `state_bucket_name` (the instance-bound zone state
+home bucket, provisioned by the converged foundation — never by this stack),
+`state_encryption_key` (the instance-bound engine key reference of this
+root's client-side state and plan encryption), audit sink settings and
 `policy_constraints`.
 
 ## Outputs

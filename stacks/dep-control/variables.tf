@@ -146,3 +146,28 @@ variable "perimeter_ingress" {
     error_message = "perimeter_ingress must bind the full perimeter resource name and at least one zone project in the projects/<number> form."
   }
 }
+
+variable "state_bucket_name" {
+  description = "Globally unique Cloud Storage bucket name of the zone state home, provisioned by the converged foundation and bound by the organization instance from the naming grammar family <organization>-<boundary>-<purpose>. The stack never assigns one and never provisions the bucket."
+  type        = string
+
+  validation {
+    condition = (
+      can(regex("^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$", var.state_bucket_name))
+      && !can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$", var.state_bucket_name))
+      && !startswith(var.state_bucket_name, "goog")
+      && !contains(var.state_bucket_name, "google")
+    )
+    error_message = "state_bucket_name must satisfy the Cloud Storage bucket naming rules: 3-63 characters of lowercase letters, digits, hyphens, underscores and dots, alphanumeric edges, never an IP form, never the goog prefix and never google or similar spellings."
+  }
+}
+
+variable "state_encryption_key" {
+  description = "Instance-bound GCP KMS key reference of the client-side state and plan encryption engine layer of this root (projects/*/locations/*/keyRings/*/cryptoKeys/*). The organization instance supplies this value as reviewed configuration; the core never presets one."
+  type        = string
+
+  validation {
+    condition     = can(regex("^projects/[^/]+/locations/[^/]+/keyRings/[^/]+/cryptoKeys/[^/]+$", var.state_encryption_key))
+    error_message = "state_encryption_key must be a full GCP KMS key resource name."
+  }
+}

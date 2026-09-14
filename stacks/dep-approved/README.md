@@ -33,6 +33,13 @@ bindings of the forensics reader access class on the zone project.
   (instance-supplied) holds exactly `roles/logging.viewer` and
   `roles/run.viewer` on this zone project and no other grant — the read-only
   diagnostic bindings are declared through the forensics-readers module.
+- The stack consumes the zone state home — the dedicated state bucket of the
+  zone holding that zone's root states and nothing else — through the final
+  `gcs` backend binding with the state-key grammar prefix identifying exactly
+  this root; the bucket is provisioned by the converged foundation, never by
+  this stack and never by hand, and every state and plan artifact of this
+  root is client-side encrypted through the engine layer of the dual
+  fortress state-encryption standard, fail-closed enforced.
 
 ## Inputs
 
@@ -40,7 +47,10 @@ bindings of the forensics reader access class on the zone project.
 `identities` (default empty), the matrix-bound member inputs
 `promoter_member`, `revocation_member` and `revalidation_reader_member`,
 `consumer_members`, `forensics_group` (the instance-bound forensics reader
-group), `evidence_bucket_name`, audit sink settings and
+group), `evidence_bucket_name`, `state_bucket_name` (the instance-bound zone state
+home bucket, provisioned by the converged foundation — never by this stack),
+`state_encryption_key` (the instance-bound engine key reference of this
+root's client-side state and plan encryption), audit sink settings and
 `policy_constraints`.
 
 ## Outputs
