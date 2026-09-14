@@ -55,6 +55,13 @@ remote repositories' configured upstreams; never a perimeter egress rule).
   exactly pinned `google-beta` provider because the pinned GA provider carries
   no resource for the surface; no other zone declares the allowance (zone
   purity).
+- The stack consumes the zone state home — the dedicated state bucket of the
+  zone holding that zone's root states and nothing else — through the final
+  `gcs` backend binding with the state-key grammar prefix identifying exactly
+  this root; the bucket is provisioned by the converged foundation, never by
+  this stack and never by hand, and every state and plan artifact of this
+  root is client-side encrypted through the engine layer of the dual
+  fortress state-encryption standard, fail-closed enforced.
 
 ## Inputs
 
@@ -64,7 +71,11 @@ remote repositories' configured upstreams; never a perimeter egress rule).
 (the instance-bound image digests keyed by canonical job name),
 `workload_network` (the instance-bound zone VPC names and CIDR),
 `forensics_group` (the instance-bound forensics reader group),
-`evidence_bucket_name`, audit sink settings and `policy_constraints`.
+`evidence_bucket_name`, `state_bucket_name` (the instance-bound zone state
+home bucket, provisioned by the converged foundation — never by this stack),
+`state_encryption_key` (the instance-bound engine key reference of this
+root's client-side state and plan encryption), audit sink settings and
+`policy_constraints`.
 
 ## Outputs
 

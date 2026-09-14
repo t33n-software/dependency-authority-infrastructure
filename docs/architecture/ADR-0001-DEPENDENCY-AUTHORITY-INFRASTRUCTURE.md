@@ -211,27 +211,30 @@ infrastructure core.
     `docs/conventions/provider-binding/beta-stage-resources.md`.
 12. The state architecture of the declaration plane follows the operating
     model: one state per root, and every trust zone owns exactly one
-    dedicated state home — a minimal state-home root declaring the zone's
-    state bucket, its operator data-plane IAM and nothing else. The
-    `state-home` module binds the bucket form of the dual fortress
-    state-encryption standard: object versioning, uniform bucket-level
-    access, enforced public access prevention and the mandatory bucket CMEK
-    with the second, cryptographically separate key (never the engine key),
-    plus exactly `roles/storage.objectAdmin` for the instance-bound
-    operator execution identities; a state bucket never carries a retention
-    policy, because the state layer is the recovery root, not an archive.
-    The `dep-control-state` stack is the first state-home root: its
-    `terraform` block carries the engine layer (the `gcp_kms` key provider
+    dedicated state home — the dedicated state bucket of the zone holding
+    that zone's root states and nothing else. The provisioning ownership of
+    every zone state home sits with the foundation layer: the converged
+    foundation provisions every zone state home through the plan-gated
+    apply, never by the zone's own roots and never by hand, so no zone root
+    ever applies with local state and every zone root carries its backend
+    configuration final from birth. Every zone stack binds the `gcs`
+    backend into the instance-bound zone state bucket with the state-key
+    grammar prefix identifying exactly the root, and the engine layer of
+    the dual fortress state-encryption standard (the `gcp_kms` key provider
     with `key_length = 32`, the `aes_gcm` method, `enforced = true` on
     state and plan, the `remote_state_data_sources` default read edge and
-    the stable `encrypted_metadata_alias`) and the `gcs` backend into the
-    instance-bound bucket with the state-key grammar prefix
-    `dep-control-state`, so even the local bootstrap state is encrypted
-    from birth and migrates into its own bucket immediately after the
-    bucket exists. The concrete key references, the bucket name and the
-    operator members are instance bindings without defaults; the keys exist
-    before any apply through the governed operator channel and converge
-    into engine management with the foundation convergence.
+    the stable `encrypted_metadata_alias`), so every state and plan
+    artifact of every root is client-side encrypted before it reaches any
+    backend. The concrete bucket names and key references are instance
+    bindings without defaults; the keys exist before any apply through the
+    governed operator channel and converge into engine management with the
+    foundation convergence. The bucket form itself — object versioning,
+    uniform bucket-level access, enforced public access prevention and the
+    mandatory bucket CMEK with the second, cryptographically separate key
+    (never the engine key), plus exactly the operator object-admin data
+    plane, and never a retention policy, because the state layer is the
+    recovery root, not an archive — is declared by the foundation layer of
+    the developer platform infrastructure core, never by this core.
 
 ## Consequences
 
