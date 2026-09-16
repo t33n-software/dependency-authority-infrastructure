@@ -135,7 +135,7 @@ variable "state_bucket_name" {
       can(regex("^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$", var.state_bucket_name))
       && !can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$", var.state_bucket_name))
       && !startswith(var.state_bucket_name, "goog")
-      && !contains(var.state_bucket_name, "google")
+      && !can(regex("google", var.state_bucket_name))
     )
     error_message = "state_bucket_name must satisfy the Cloud Storage bucket naming rules: 3-63 characters of lowercase letters, digits, hyphens, underscores and dots, alphanumeric edges, never an IP form, never the goog prefix and never google or similar spellings."
   }
