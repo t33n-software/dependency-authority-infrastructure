@@ -1707,6 +1707,40 @@ func TestZoneStacksBindTheFoundationProvisionedStateHome(t *testing.T) {
 	}
 }
 
+func TestZoneStacksBindTheProvenStateBucketNameValidation(t *testing.T) {
+	// Regression guard (DAI-23): the state_bucket_name validation of every
+	// zone stack binds the documented string-matching form of the OpenTofu
+	// quality-gates reference. The retired form bound the membership test
+	// contains against the string variable, which errors only when a value is
+	// evaluated and therefore passed format, initialization and validation
+	// silently — the proven defect class. Every corrected root also carries
+	// its behavioral proof beside the code: the acceptance run and the four
+	// rejection runs of the naming rules, executed in the governed execution
+	// window because the encryption-carrying roots never initialize offline.
+	for _, stack := range stackNames {
+		variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf")))
+		if !strings.Contains(variables, `!can(regex("google", var.state_bucket_name))`) {
+			t.Fatalf("stacks/%s/variables.tf does not bind the documented string-matching form for the google-spelling clause of state_bucket_name", stack)
+		}
+		if strings.Contains(variables, "contains(var.state_bucket_name") {
+			t.Fatalf("stacks/%s/variables.tf still carries the membership test on the state_bucket_name string; contains requires a list, tuple or set as its first argument and errors at evaluation on a string", stack)
+		}
+
+		fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tofutest.hcl")))
+		if count := strings.Count(fixture, "expect_failures = [var.state_bucket_name]"); count != 4 {
+			t.Fatalf("stacks/%s/variables.tofutest.hcl carries %d rejection runs of state_bucket_name, want exactly 4 (invalid characters, IP form, goog prefix, google substring)", stack, count)
+		}
+		if !strings.Contains(fixture, `run "accepts_a_valid_state_bucket_name"`) {
+			t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the acceptance run of state_bucket_name", stack)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-23") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-23")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {
