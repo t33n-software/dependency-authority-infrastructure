@@ -1,5 +1,6 @@
-# The behavioral proof of the corrected state_bucket_name validation of the
-# dep-control root: the acceptance path through an assertion and the rejection
+# The behavioral proofs of the dep-control root: the corrected
+# state_bucket_name validation, the workload-job activation gate and the
+# recovery binding — the acceptance paths through assertions and the rejection
 # paths through expect_failures — every run is a plan with refresh disabled,
 # and no run creates infrastructure.
 #
@@ -64,6 +65,19 @@ variables {
   }
 
   forensics_group = "group:dep-forensics-readers@example.com"
+
+  enabled_workload_jobs = [
+    "dep-admission",
+    "dep-promotion",
+    "dep-revalidation",
+    "dep-revocation",
+    "dep-consumer-verification",
+  ]
+
+  break_glass_recovery = {
+    role               = "roles/resourcemanager.projectIamAdmin"
+    condition_end_time = "2027-01-01T00:00:00Z"
+  }
 
   perimeter_ingress = {
     perimeter_name = "accessPolicies/100000000001/servicePerimeters/dependency_authority"
@@ -142,4 +156,48 @@ run "rejects_a_bucket_name_with_the_google_substring" {
   }
 
   expect_failures = [var.state_bucket_name]
+}
+
+run "accepts_the_activation_set" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = contains(var.enabled_workload_jobs, "dep-consumer-verification")
+    error_message = "The activation set must carry the declared jobs of the zone topology."
+  }
+}
+
+run "rejects_an_unknown_enabled_job" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    enabled_workload_jobs = ["dep-admission", "dep-ghost"]
+  }
+
+  expect_failures = [var.enabled_workload_jobs]
+}
+
+run "rejects_an_invalid_recovery_end_time" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    break_glass_recovery = {
+      role               = "roles/resourcemanager.projectIamAdmin"
+      condition_end_time = "not-a-timestamp"
+    }
+  }
+
+  expect_failures = [var.break_glass_recovery]
 }

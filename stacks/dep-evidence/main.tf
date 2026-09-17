@@ -120,8 +120,12 @@ module "repository_iam" {
 }
 
 module "workload_jobs" {
-  source   = "../../modules/cloud-run-job"
-  for_each = local.workload_jobs
+  source = "../../modules/cloud-run-job"
+  # The engine-active surface of the zone's job topology: exactly the
+  # instance-bound activation set — the bound jobs plus the jobs being
+  # provisioned in the current window. A declared-but-planned job never
+  # enters the plan until its provisioning window activates it.
+  for_each = { for job, spec in local.workload_jobs : job => spec if contains(var.enabled_workload_jobs, job) }
 
   project_id            = var.project_id
   location              = var.location

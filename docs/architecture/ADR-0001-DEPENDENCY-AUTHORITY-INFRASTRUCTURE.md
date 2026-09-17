@@ -235,6 +235,30 @@ infrastructure core.
     plane, and never a retention policy, because the state layer is the
     recovery root, not an archive — is declared by the foundation layer of
     the developer platform infrastructure core, never by this core.
+13. The workload job surfaces of the job-owning stacks follow the
+    engine-active surface composition of the operating model: every
+    job-owning stack (dep-intake, dep-control, dep-evidence) consumes the
+    instance-bound activation set through the required
+    `enabled_workload_jobs` input (never a stack default) and filters the
+    declared job topology through it
+    (`for_each = { for job, spec in local.workload_jobs : job => spec if contains(var.enabled_workload_jobs, job) }`),
+    so a declared-but-planned job never enters the plan until its
+    provisioning window activates it — the convergence zero-drift proof and
+    the steady-state drift-detection cadence read empty for
+    declared-but-planned surfaces instead of reporting the declaration
+    chain's forward path as drift. The declaration binds the consistency
+    fail-closed: the activation set references only declared jobs of the
+    zone topology (proven against the pinned engine), and the module's
+    fail-closed image validation keeps an activated job always on a proven
+    immutable digest. The activation of a planned surface is a reviewed
+    change of the instance binding — the same governed form as every
+    binding change. The control stack additionally declares the recovery
+    identity of the canonical IAM target matrix through the recovery
+    module: the dedicated identity whose elevated project role exists only
+    under the mandatory time-bound IAM condition, never federated from CI
+    and never carrying a data-plane grant, with the role and the end time
+    as approved instance decisions supplied through the
+    `break_glass_recovery` input; no other stack ever declares it.
 
 ## Consequences
 

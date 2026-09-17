@@ -22,6 +22,14 @@ data plane directly.
   status `planned` (a documented placeholder) until the promotion read-back
   proof exists, and flips it to `bound` only after that proof. A placeholder
   fails provisioning closed.
+- The calling stack binds the engine-active surface through the
+  instance-bound activation set (`enabled_workload_jobs`): exactly the bound
+  jobs plus the jobs being provisioned in the current window. A
+  declared-but-planned job is never engine-active and never enters the plan
+  until its provisioning window activates it — the stack filters the declared
+  topology through the activation set, and the set always carries every bound
+  job, because a bound job dropped from the active set would plan its own
+  destruction.
 - The image reference is always the full immutable `@sha256:` digest of a
   release-class workload image registry — never a tag, never a mutable
   reference, never the staging class, never a dependency repository.

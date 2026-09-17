@@ -1,7 +1,8 @@
-# The behavioral proof of the corrected state_bucket_name validation of the
-# dep-intake root: the acceptance path through an assertion and the rejection
-# paths through expect_failures — every run is a plan with refresh disabled,
-# and no run creates infrastructure.
+# The behavioral proofs of the dep-intake root: the corrected
+# state_bucket_name validation and the workload-job activation gate — the
+# acceptance paths through assertions and the rejection paths through
+# expect_failures — every run is a plan with refresh disabled, and no run
+# creates infrastructure.
 #
 # The root carries the gcs backend binding and the dual-fortress encryption
 # block, so its initialization resolves the state bucket and the encryption
@@ -34,6 +35,8 @@ variables {
   }
 
   forensics_group = "group:dep-forensics-readers@example.com"
+
+  enabled_workload_jobs = ["dep-intake-fetch"]
 }
 
 run "accepts_a_valid_state_bucket_name" {
@@ -107,4 +110,31 @@ run "rejects_a_bucket_name_with_the_google_substring" {
   }
 
   expect_failures = [var.state_bucket_name]
+}
+
+run "accepts_the_activation_set" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = contains(var.enabled_workload_jobs, "dep-intake-fetch")
+    error_message = "The activation set must carry the declared jobs of the zone topology."
+  }
+}
+
+run "rejects_an_unknown_enabled_job" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    enabled_workload_jobs = ["dep-intake-fetch", "dep-ghost"]
+  }
+
+  expect_failures = [var.enabled_workload_jobs]
 }

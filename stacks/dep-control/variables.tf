@@ -171,3 +171,48 @@ variable "state_encryption_key" {
     error_message = "state_encryption_key must be a full GCP KMS key resource name."
   }
 }
+
+variable "enabled_workload_jobs" {
+  description = <<-EOT
+    The instance-bound activation set of the zone's workload jobs: exactly the
+    bound jobs plus the jobs being provisioned in the current window. A
+    declared-but-planned job is never engine-active and never enters the plan
+    until its provisioning window activates it through this set; the set
+    always carries every bound job, because a bound job dropped from the
+    active set would plan its own destruction. The organization instance
+    supplies this value as reviewed configuration; the core never presets it.
+  EOT
+  type        = set(string)
+
+  validation {
+    condition     = length(setsubtract(var.enabled_workload_jobs, keys(local.workload_jobs))) == 0
+    error_message = "enabled_workload_jobs must reference only declared workload jobs of the zone topology."
+  }
+}
+
+variable "break_glass_recovery" {
+  description = <<-EOT
+    The approved recovery binding of the control zone: the project-level role
+    the recovery identity receives under the mandatory time-bound IAM
+    condition and the RFC 3339 UTC end time after which the grant stops
+    applying. Both are approved instance decisions; the core never presets
+    them.
+  EOT
+  type = object({
+    role               = string
+    condition_end_time = string
+  })
+
+  validation {
+    condition = (
+      can(regex("^roles/[A-Za-z][A-Za-z0-9._]+$", var.break_glass_recovery.role))
+      || can(regex("^projects/[a-z][a-z0-9-]*/roles/[A-Za-z][A-Za-z0-9_]*$", var.break_glass_recovery.role))
+    )
+    error_message = "break_glass_recovery.role must be a predefined Google Cloud role (roles/<role>) or a project-level custom role (projects/<project>/roles/<roleId>)."
+  }
+
+  validation {
+    condition     = can(timecmp(var.break_glass_recovery.condition_end_time, "1970-01-01T00:00:00Z"))
+    error_message = "break_glass_recovery.condition_end_time must be a valid RFC 3339 timestamp."
+  }
+}

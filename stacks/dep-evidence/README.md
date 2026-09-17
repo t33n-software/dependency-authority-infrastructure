@@ -37,6 +37,14 @@ diagnostic bindings of the forensics reader access class on the zone project.
   release-class workload image registry only; the digests are instance
   bindings (`planned` with documented placeholders until the promotion
   read-back proofs flip them to `bound`), never stack defaults.
+- The workload jobs of the zone follow the engine-active surface composition
+  of the operating model: the stack consumes the instance-bound activation
+  set (`enabled_workload_jobs`) — exactly the bound jobs plus the jobs being
+  provisioned in the current window — and a declared-but-planned job never
+  enters the plan until its provisioning window activates it. The activation
+  set always carries every bound job (a bound job dropped from the active set
+  would plan its own destruction), and the declaration binds the consistency
+  fail-closed.
 - The workload jobs attach to the zone VPC declared by this stack and route
   all outgoing traffic through it (Direct VPC egress, all-traffic): the
   workload network origin is part of the execution contract, and the stack
@@ -63,8 +71,11 @@ diagnostic bindings of the forensics reader access class on the zone project.
 
 `project_id`, `location`, `ecosystems` (default `["go"]`), `pool_id`,
 `writer` and `auditor` (OIDC bindings), `workload_job_images` (the
-instance-bound image digests keyed by canonical job name), `workload_network`
-(the instance-bound zone VPC names and CIDR), `archive_bucket_name`,
+instance-bound image digests keyed by canonical job name),
+`enabled_workload_jobs` (the instance-bound activation set of the zone's
+workload jobs: exactly the bound jobs plus the jobs being provisioned in the
+current window), `workload_network` (the instance-bound zone VPC names and
+CIDR), `archive_bucket_name`,
 `retention_period_seconds`, `lock_retention_policy`,
 optional `archive_kms_key_name`, the matrix-bound `additional_writer_members`
 and `additional_auditor_members`, `forensics_group` (the instance-bound
