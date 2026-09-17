@@ -111,8 +111,12 @@ module "workload_identity" {
 }
 
 module "workload_jobs" {
-  source   = "../../modules/cloud-run-job"
-  for_each = local.workload_jobs
+  source = "../../modules/cloud-run-job"
+  # The engine-active surface of the zone's job topology: exactly the
+  # instance-bound activation set — the bound jobs plus the jobs being
+  # provisioned in the current window. A declared-but-planned job never
+  # enters the plan until its provisioning window activates it.
+  for_each = { for job, spec in local.workload_jobs : job => spec if contains(var.enabled_workload_jobs, job) }
 
   project_id            = var.project_id
   location              = var.location
@@ -170,4 +174,18 @@ module "forensics_readers" {
 
   forensics_group   = var.forensics_group
   perimeter_ingress = var.perimeter_ingress
+}
+
+# The recovery identity of the control zone: the dedicated identity whose
+# elevated project role exists only under the mandatory time-bound IAM
+# condition. It is never used in normal operation, never federated from CI and
+# holds no data-plane grant; every use is an audited incident action with a
+# recorded decision. The role and the end time are approved instance
+# decisions, supplied through the instance-bound input.
+module "recovery" {
+  source     = "../../modules/recovery"
+  project_id = var.project_id
+
+  role               = var.break_glass_recovery.role
+  condition_end_time = var.break_glass_recovery.condition_end_time
 }

@@ -197,3 +197,21 @@ variable "state_encryption_key" {
     error_message = "state_encryption_key must be a full GCP KMS key resource name."
   }
 }
+
+variable "enabled_workload_jobs" {
+  description = <<-EOT
+    The instance-bound activation set of the zone's workload jobs: exactly the
+    bound jobs plus the jobs being provisioned in the current window. A
+    declared-but-planned job is never engine-active and never enters the plan
+    until its provisioning window activates it through this set; the set
+    always carries every bound job, because a bound job dropped from the
+    active set would plan its own destruction. The organization instance
+    supplies this value as reviewed configuration; the core never presets it.
+  EOT
+  type        = set(string)
+
+  validation {
+    condition     = length(setsubtract(var.enabled_workload_jobs, keys(local.workload_jobs))) == 0
+    error_message = "enabled_workload_jobs must reference only declared workload jobs of the zone topology."
+  }
+}

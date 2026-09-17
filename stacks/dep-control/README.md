@@ -43,6 +43,20 @@ perimeter ingress rule of the class.
   release-class workload image registry only; the digests are instance
   bindings (`planned` with documented placeholders until the promotion
   read-back proofs flip them to `bound`), never stack defaults.
+- The workload jobs of the zone follow the engine-active surface composition
+  of the operating model: the stack consumes the instance-bound activation
+  set (`enabled_workload_jobs`) — exactly the bound jobs plus the jobs being
+  provisioned in the current window — and a declared-but-planned job never
+  enters the plan until its provisioning window activates it. The activation
+  set always carries every bound job (a bound job dropped from the active set
+  would plan its own destruction), and the declaration binds the consistency
+  fail-closed.
+- The recovery identity of the control zone: the stack declares the dedicated
+  identity through the recovery module — its elevated project role exists
+  only under the mandatory time-bound IAM condition, it is never used in
+  normal operation and never federated from CI, and it holds no data-plane
+  grant. The role and the end time are approved instance decisions, supplied
+  through the `break_glass_recovery` input.
 - The workload jobs attach to the zone VPC declared by this stack and route
   all outgoing traffic through it (Direct VPC egress, all-traffic): the
   workload network origin is part of the execution contract, and the stack
@@ -73,7 +87,12 @@ perimeter ingress rule of the class.
 
 `project_id`, `location`, `pool_id`, `controllers` (OIDC bindings of the
 controller identities), `workload_job_images` (the instance-bound image
-digests keyed by canonical job name), `workload_network` (the instance-bound
+digests keyed by canonical job name), `enabled_workload_jobs` (the
+instance-bound activation set of the zone's workload jobs: exactly the bound
+jobs plus the jobs being provisioned in the current window),
+`break_glass_recovery` (the approved recovery binding of the control zone:
+the project-level role under the mandatory time-bound IAM condition and the
+RFC 3339 end time), `workload_network` (the instance-bound
 zone VPC names and CIDR), `cross_zone_workload_reader_members`
 (the matrix-bound readers of the other zones), `forensics_group` (the
 instance-bound forensics reader group), `perimeter_ingress` (the
@@ -90,5 +109,5 @@ Controller service account emails and their invoke-only trigger identity
 emails keyed by lane, the pool resource name, the audit sink writer
 identity, the enforced policy constraints, the workload image repository IDs
 and endpoint URIs keyed by class (`staging`, `release`), the workload job
-resource IDs keyed by canonical job name and the workload network and
-subnetwork resource IDs.
+resource IDs keyed by canonical job name, the workload network and
+subnetwork resource IDs and the recovery identity email.

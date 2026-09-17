@@ -47,3 +47,8 @@ output "workload_subnetwork_id" {
   description = "Resource ID of the zone workload subnetwork, bound by the zone's workload jobs."
   value       = module.network.workload_subnetwork_id
 }
+
+output "break_glass_recovery_service_account_email" {
+  description = "Email of the time-bound recovery identity of the control zone (dep-break-glass-recovery)."
+  value       = module.recovery.service_account_email
+}

@@ -34,6 +34,14 @@ remote repositories' configured upstreams; never a perimeter egress rule).
   release-class workload image registry only; the digest is an instance
   binding (`planned` with a documented placeholder until the promotion
   read-back proof flips it to `bound`), never a stack default.
+- The workload job of the zone follows the engine-active surface composition
+  of the operating model: the stack consumes the instance-bound activation
+  set (`enabled_workload_jobs`) — exactly the bound jobs plus the jobs being
+  provisioned in the current window — and a declared-but-planned job never
+  enters the plan until its provisioning window activates it. The activation
+  set always carries every bound job (a bound job dropped from the active set
+  would plan its own destruction), and the declaration binds the consistency
+  fail-closed.
 - The workload job attaches to the zone VPC declared by this stack and routes
   all outgoing traffic through it (Direct VPC egress, all-traffic): the
   workload network origin is part of the execution contract, and the stack
@@ -69,7 +77,10 @@ remote repositories' configured upstreams; never a perimeter egress rule).
 `fetcher` (OIDC bindings of the intake fetcher), `additional_reader_members`
 (the matrix-bound control-plane readers), `workload_job_images`
 (the instance-bound image digests keyed by canonical job name),
-`workload_network` (the instance-bound zone VPC names and CIDR),
+`enabled_workload_jobs` (the instance-bound activation set of the zone's
+workload jobs: exactly the bound jobs plus the jobs being provisioned in the
+current window), `workload_network` (the instance-bound zone VPC names and
+CIDR),
 `forensics_group` (the instance-bound forensics reader group),
 `evidence_bucket_name`, `state_bucket_name` (the instance-bound zone state
 home bucket, provisioned by the converged foundation — never by this stack),
