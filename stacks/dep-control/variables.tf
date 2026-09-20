@@ -216,3 +216,72 @@ variable "break_glass_recovery" {
     error_message = "break_glass_recovery.condition_end_time must be a valid RFC 3339 timestamp."
   }
 }
+
+variable "workload_image_cleanup" {
+  description = <<-EOT
+    The instance-bound workload image lifecycle binding of the control zone:
+    the declared, platform-executed cleanup policies of the two workload image
+    registries and their dry-run activation state, keyed by the canonical
+    class. The organization instance binds the canonical convention values —
+    the staging class deletes image versions older than 30 days and always
+    keeps the most recent 2 per package; the release class always keeps the
+    most recent 5 per package and never carries a time-based deletion — with
+    binding status planned until the list-cleanup-policies read-back proof
+    flips them to bound. The dry-run state starts true (the fail-safe
+    posture) and flips to false only through the governed activation window
+    after the dry-run proof. The core never presets it.
+  EOT
+  type = object({
+    staging = object({
+      dry_run = bool
+      policies = map(object({
+        action = string
+        condition = optional(object({
+          tag_state             = optional(string)
+          tag_prefixes          = optional(list(string))
+          version_name_prefixes = optional(list(string))
+          package_name_prefixes = optional(list(string))
+          older_than            = optional(string)
+          newer_than            = optional(string)
+        }))
+        most_recent_versions = optional(object({
+          package_name_prefixes = optional(list(string))
+          keep_count            = optional(number)
+        }))
+      }))
+    })
+    release = object({
+      dry_run = bool
+      policies = map(object({
+        action = string
+        condition = optional(object({
+          tag_state             = optional(string)
+          tag_prefixes          = optional(list(string))
+          version_name_prefixes = optional(list(string))
+          package_name_prefixes = optional(list(string))
+          older_than            = optional(string)
+          newer_than            = optional(string)
+        }))
+        most_recent_versions = optional(object({
+          package_name_prefixes = optional(list(string))
+          keep_count            = optional(number)
+        }))
+      }))
+    })
+  })
+
+  validation {
+    condition     = alltrue([for _, policy in var.workload_image_cleanup.release.policies : policy.action == "KEEP"])
+    error_message = "the release class carries a depth retention only: keep policies, never a delete policy and never a time-based expiry."
+  }
+
+  validation {
+    condition     = anytrue([for _, policy in var.workload_image_cleanup.staging.policies : policy.action == "DELETE" && policy.condition != null && policy.condition.older_than != null])
+    error_message = "the staging class carries the short transit retention: a time-based delete policy plus the keep floor."
+  }
+
+  validation {
+    condition     = anytrue([for _, policy in var.workload_image_cleanup.staging.policies : policy.action == "KEEP" && policy.most_recent_versions != null && policy.most_recent_versions.keep_count != null])
+    error_message = "the staging class carries the keep floor: a most-recent-versions keep policy."
+  }
+}

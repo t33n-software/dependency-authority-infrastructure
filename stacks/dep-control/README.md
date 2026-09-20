@@ -35,6 +35,16 @@ perimeter ingress rule of the class.
   through the instance-supplied member input) receives read access on the
   release class; no identity ever receives a writer grant on either class,
   and the staging class carries no binding at all.
+- The two workload image registries carry the declared, platform-executed
+  workload image lifecycle: the organization instance binds the canonical
+  convention values (the staging class deletes image versions older than 30
+  days and always keeps the most recent 2 per package; the release class
+  always keeps the most recent 5 per package and never carries a time-based
+  deletion) through the required `workload_image_cleanup` input — never a
+  stack default — with binding status planned until the
+  list-cleanup-policies read-back proof flips them to bound; the dry-run
+  activation state starts true (the fail-safe posture) and flips to false
+  only through the governed activation window after the dry-run proof.
 - The stack creates no project and enables no APIs; the organization instance
   provisions the project and its API surface first.
 - The audit export requires the dep-evidence archive bucket; provisioning
@@ -87,7 +97,10 @@ perimeter ingress rule of the class.
 
 `project_id`, `location`, `pool_id`, `controllers` (OIDC bindings of the
 controller identities), `workload_job_images` (the instance-bound image
-digests keyed by canonical job name), `enabled_workload_jobs` (the
+digests keyed by canonical job name), `workload_image_cleanup` (the
+instance-bound lifecycle binding of the two workload image registries: the
+per-class cleanup policies and the dry-run activation state),
+`enabled_workload_jobs` (the
 instance-bound activation set of the zone's workload jobs: exactly the bound
 jobs plus the jobs being provisioned in the current window),
 `break_glass_recovery` (the approved recovery binding of the control zone:

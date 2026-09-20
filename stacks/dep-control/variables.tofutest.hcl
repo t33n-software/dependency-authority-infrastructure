@@ -1,8 +1,9 @@
 # The behavioral proofs of the dep-control root: the corrected
-# state_bucket_name validation, the workload-job activation gate and the
-# recovery binding — the acceptance paths through assertions and the rejection
-# paths through expect_failures — every run is a plan with refresh disabled,
-# and no run creates infrastructure.
+# state_bucket_name validation, the workload-job activation gate, the
+# recovery binding and the workload image cleanup lifecycle binding — the
+# acceptance paths through assertions and the rejection paths through
+# expect_failures — every run is a plan with refresh disabled, and no run
+# creates infrastructure.
 #
 # The root carries the gcs backend binding and the dual-fortress encryption
 # block, so its initialization resolves the state bucket and the encryption
@@ -82,6 +83,42 @@ variables {
   perimeter_ingress = {
     perimeter_name = "accessPolicies/100000000001/servicePerimeters/dependency_authority"
     zone_projects  = ["projects/100000000002", "projects/100000000003"]
+  }
+
+  # The synthetic form of the canonical lifecycle binding: the staging class
+  # carries the time-based delete plus the keep floor, the release class
+  # carries the keep floor only, and both carry the fail-safe dry-run
+  # posture.
+  workload_image_cleanup = {
+    staging = {
+      dry_run = true
+      policies = {
+        "delete-stale-staging" = {
+          action = "DELETE"
+          condition = {
+            tag_state  = "ANY"
+            older_than = "30d"
+          }
+        }
+        "keep-recent-staging" = {
+          action = "KEEP"
+          most_recent_versions = {
+            keep_count = 2
+          }
+        }
+      }
+    }
+    release = {
+      dry_run = true
+      policies = {
+        "keep-recent-release" = {
+          action = "KEEP"
+          most_recent_versions = {
+            keep_count = 5
+          }
+        }
+      }
+    }
   }
 }
 
@@ -200,4 +237,142 @@ run "rejects_an_invalid_recovery_end_time" {
   }
 
   expect_failures = [var.break_glass_recovery]
+}
+
+run "accepts_the_canonical_cleanup_binding" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.workload_image_cleanup.release.dry_run == true
+    error_message = "The cleanup binding must arrive with the fail-safe dry-run posture."
+  }
+}
+
+run "rejects_a_delete_policy_on_the_release_class" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    workload_image_cleanup = {
+      staging = {
+        dry_run = true
+        policies = {
+          "delete-stale-staging" = {
+            action = "DELETE"
+            condition = {
+              tag_state  = "ANY"
+              older_than = "30d"
+            }
+          }
+          "keep-recent-staging" = {
+            action = "KEEP"
+            most_recent_versions = {
+              keep_count = 2
+            }
+          }
+        }
+      }
+      release = {
+        dry_run = true
+        policies = {
+          "delete-old-release" = {
+            action = "DELETE"
+            condition = {
+              older_than = "365d"
+            }
+          }
+          "keep-recent-release" = {
+            action = "KEEP"
+            most_recent_versions = {
+              keep_count = 5
+            }
+          }
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.workload_image_cleanup]
+}
+
+run "rejects_a_staging_binding_without_the_time_delete" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    workload_image_cleanup = {
+      staging = {
+        dry_run = true
+        policies = {
+          "keep-recent-staging" = {
+            action = "KEEP"
+            most_recent_versions = {
+              keep_count = 2
+            }
+          }
+        }
+      }
+      release = {
+        dry_run = true
+        policies = {
+          "keep-recent-release" = {
+            action = "KEEP"
+            most_recent_versions = {
+              keep_count = 5
+            }
+          }
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.workload_image_cleanup]
+}
+
+run "rejects_a_staging_binding_without_the_keep_floor" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    workload_image_cleanup = {
+      staging = {
+        dry_run = true
+        policies = {
+          "delete-stale-staging" = {
+            action = "DELETE"
+            condition = {
+              tag_state  = "ANY"
+              older_than = "30d"
+            }
+          }
+        }
+      }
+      release = {
+        dry_run = true
+        policies = {
+          "keep-recent-release" = {
+            action = "KEEP"
+            most_recent_versions = {
+              keep_count = 5
+            }
+          }
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.workload_image_cleanup]
 }

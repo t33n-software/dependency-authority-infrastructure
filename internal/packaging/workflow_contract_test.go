@@ -1890,6 +1890,148 @@ func TestZoneStacksBindTheProvenStateBucketNameValidation(t *testing.T) {
 	}
 }
 
+func TestControlStackBindsTheWorkloadImageCleanupLifecycle(t *testing.T) {
+	// The workload image lifecycle and retention convention: the declared,
+	// platform-executed cleanup policies of the two workload image registries.
+	// The module owns the provider-schema-proven surface and binds the class
+	// rule fail-closed; the control stack binds the instance-supplied values
+	// through the required input; every other stack is pure.
+	moduleVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "variables.tf")))
+	for _, required := range []string{
+		`variable "cleanup_policies" {`,
+		`variable "cleanup_policy_dry_run" {`,
+		`default = true`,
+		`length(var.cleanup_policies) == 0 || var.format == "DOCKER"`,
+		`append-only supply-chain records`,
+	} {
+		if !strings.Contains(moduleVariables, required) {
+			t.Fatalf("modules/artifact-registry/variables.tf does not bind the workload image cleanup lifecycle element %q", required)
+		}
+	}
+
+	moduleMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "main.tf")))
+	for _, required := range []string{
+		`dynamic "cleanup_policies" {`,
+		`for_each = var.cleanup_policies`,
+		`id = cleanup_policies.key`,
+		`cleanup_policy_dry_run = var.cleanup_policy_dry_run`,
+	} {
+		if !strings.Contains(moduleMain, required) {
+			t.Fatalf("modules/artifact-registry/main.tf does not bind the cleanup policy surface element %q", required)
+		}
+	}
+
+	// The behavioral proof of the class rule lives beside the module and
+	// carries the acceptance and rejection runs.
+	moduleFixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`run "accepts_docker_cleanup_policies"`,
+		`run "rejects_cleanup_policies_on_a_dependency_repository"`,
+		`run "rejects_cleanup_policies_on_an_evidence_repository"`,
+		`expect_failures = [var.cleanup_policies]`,
+	} {
+		if !strings.Contains(moduleFixture, required) {
+			t.Fatalf("modules/artifact-registry/variables.tofutest.hcl does not carry the class-rule proof element %q", required)
+		}
+	}
+
+	// The control stack binds the instance-supplied lifecycle values through
+	// the required input — never a stack default — and proves the
+	// convention's structural rules fail-closed.
+	controlVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tf")))
+	start := strings.Index(controlVariables, `variable "workload_image_cleanup" {`)
+	if start < 0 {
+		t.Fatal("stacks/dep-control/variables.tf does not carry the workload_image_cleanup input")
+	}
+	segment := controlVariables[start:]
+	if strings.Contains(segment, "default") {
+		t.Fatal("stacks/dep-control/variables.tf carries a default for workload_image_cleanup; the lifecycle binding is an instance binding, never a stack default")
+	}
+	for _, required := range []string{
+		`dry_run = bool`,
+		`policies = map(object(`,
+		`alltrue([for _, policy in var.workload_image_cleanup.release.policies : policy.action == "KEEP"])`,
+		`anytrue([for _, policy in var.workload_image_cleanup.staging.policies : policy.action == "DELETE" && policy.condition != null && policy.condition.older_than != null])`,
+		`anytrue([for _, policy in var.workload_image_cleanup.staging.policies : policy.action == "KEEP" && policy.most_recent_versions != null && policy.most_recent_versions.keep_count != null])`,
+	} {
+		if !strings.Contains(segment, required) {
+			t.Fatalf("stacks/dep-control/variables.tf does not bind the workload image cleanup lifecycle element %q", required)
+		}
+	}
+
+	controlMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "main.tf")))
+	for _, required := range []string{
+		`cleanup_policies = var.workload_image_cleanup[each.key].policies`,
+		`cleanup_policy_dry_run = var.workload_image_cleanup[each.key].dry_run`,
+	} {
+		if !strings.Contains(controlMain, required) {
+			t.Fatalf("stacks/dep-control/main.tf does not wire the workload image cleanup lifecycle element %q", required)
+		}
+	}
+
+	// Zone purity: no other stack ever carries the lifecycle binding.
+	for _, stack := range []string{"dep-intake", "dep-evidence", "dep-approved", "dep-quarantine"} {
+		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
+		if strings.Contains(main, "cleanup_policies") || strings.Contains(main, "workload_image_cleanup") {
+			t.Fatalf("stacks/%s must never bind the workload image cleanup lifecycle; only the control zone carries the workload image registries", stack)
+		}
+		variables := readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf"))
+		if strings.Contains(variables, "workload_image_cleanup") {
+			t.Fatalf("stacks/%s/variables.tf must never carry the workload image cleanup binding; it lives exactly once in dep-control", stack)
+		}
+	}
+
+	// The behavioral proofs of the structural rules live beside the stack.
+	fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`workload_image_cleanup = {`,
+		`run "accepts_the_canonical_cleanup_binding"`,
+		`run "rejects_a_delete_policy_on_the_release_class"`,
+		`run "rejects_a_staging_binding_without_the_time_delete"`,
+		`run "rejects_a_staging_binding_without_the_keep_floor"`,
+		`expect_failures = [var.workload_image_cleanup]`,
+	} {
+		if !strings.Contains(fixture, required) {
+			t.Fatalf("stacks/dep-control/variables.tofutest.hcl does not carry the cleanup lifecycle proof element %q", required)
+		}
+	}
+
+	// The documentation surfaces carry the lifecycle form: the module README
+	// carries the class rule and the provider-schema proof, the stack README
+	// carries the instance-bound input, the architecture decision record
+	// carries the declaration decision and the register carries the ticket.
+	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "artifact-registry", "README.md"))
+	for _, required := range []string{"append-only supply-chain records", "tofu providers schema", "7.44.0"} {
+		if !strings.Contains(moduleReadme, required) {
+			t.Fatalf("the artifact-registry module README does not document %q of the cleanup lifecycle", required)
+		}
+	}
+
+	stackReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-control", "README.md"))
+	for _, required := range []string{"workload_image_cleanup", "cleanup", "dry-run"} {
+		if !strings.Contains(stackReadme, required) {
+			t.Fatalf("the dep-control stack README does not document %q of the cleanup lifecycle", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"workload image lifecycle",
+		"cleanup",
+		"dry-run",
+		"append-only supply-chain records",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the workload image cleanup lifecycle element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-25") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-25")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {

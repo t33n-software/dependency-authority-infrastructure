@@ -106,9 +106,10 @@ variable "vpcsc_upstream_allowance" {
 
 variable "cleanup_policies" {
   description = <<-EOT
-    Cleanup policies keyed by policy ID. Intake zones use them for short-lived
-    candidate retention; quarantine, approved and evidence zones keep them empty
-    by default.
+    Cleanup policies keyed by policy ID — the declared, platform-executed
+    workload image lifecycle form. Only DOCKER workload image repositories
+    carry cleanup policies; the dependency repositories and the evidence plane
+    are append-only supply-chain records and never carry one.
   EOT
   type = map(object({
     action = string
@@ -130,6 +131,11 @@ variable "cleanup_policies" {
   validation {
     condition     = alltrue([for _, policy in var.cleanup_policies : contains(["DELETE", "KEEP"], policy.action)])
     error_message = "cleanup policy action must be DELETE or KEEP."
+  }
+
+  validation {
+    condition     = length(var.cleanup_policies) == 0 || var.format == "DOCKER"
+    error_message = "cleanup policies are the workload image lifecycle form: only DOCKER workload image repositories carry them; dependency repositories and the evidence plane are append-only supply-chain records and never carry a cleanup policy."
   }
 }
 

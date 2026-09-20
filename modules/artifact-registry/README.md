@@ -30,6 +30,15 @@ GENERIC evidence repositories and DOCKER workload image repositories
 - Revocation download rules (`google_artifact_registry_rule`) are a runtime
   operation of the revocation controller and are intentionally never created
   by this module.
+- Cleanup policies (`cleanup_policies`, `cleanup_policy_dry_run`) are the
+  declared, platform-executed workload image lifecycle form: only DOCKER
+  workload image repositories carry them, because the dependency repositories
+  and the evidence plane are append-only supply-chain records; the module
+  binds the class rule fail-closed. The policy block form is proven against
+  the pinned provider schema (google 7.44.0, `tofu providers schema -json`),
+  never assumed: `tag_state` binds `TAGGED`, `UNTAGGED` or `ANY` (the default
+  is `ANY`), `most_recent_versions` pairs only with the `KEEP` action, and
+  `older_than`/`newer_than` carry duration strings such as `30d`.
 - Virtual consumer endpoints are out of scope; an optional virtual endpoint
   may only ever aggregate Approved standard repositories and is a separate
   governed decision.
