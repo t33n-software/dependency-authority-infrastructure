@@ -259,6 +259,33 @@ infrastructure core.
     and never carrying a data-plane grant, with the role and the end time
     as approved instance decisions supplied through the
     `break_glass_recovery` input; no other stack ever declares it.
+14. The workload image registries carry the declared, platform-executed
+    workload image lifecycle of the workload image lifecycle and retention
+    convention: the artifact-registry module owns the cleanup policy surface
+    (the `cleanup_policies` map keyed by policy ID and the
+    `cleanup_policy_dry_run` flag, defaulting to the fail-safe dry-run
+    posture) and binds the class rule fail-closed — only DOCKER workload
+    image repositories carry cleanup policies, because the dependency
+    repositories and the evidence plane are append-only supply-chain
+    records. The policy block form is proven against the pinned provider
+    schema (google 7.44.0) through `tofu providers schema -json`, never
+    assumed: `tag_state` binds `TAGGED`, `UNTAGGED` or `ANY`,
+    `most_recent_versions` pairs only with the `KEEP` action, and
+    `older_than`/`newer_than` carry duration strings. The control stack
+    binds the two registries through the required instance-bound
+    `workload_image_cleanup` input (never a stack default): the per-class
+    policy content and the dry-run activation state, with the convention's
+    structural rules proven fail-closed — the release class carries keep
+    policies only and never a time-based deletion, and the staging class
+    carries the time-based delete plus the keep floor. The concrete values
+    (30 days, keep 2, keep 5) are the canonical convention values, bound by
+    the organization instance with binding status planned until the
+    list-cleanup-policies read-back proof flips them to bound; the dry-run
+    state flips to active only through the governed activation window after
+    the dry-run proof. No other stack ever carries the binding (zone
+    purity), and the behavioral proofs live beside the code: the module
+    fixture proves the class rule offline, and the stack fixture proves the
+    structural rules in the governed execution window.
 
 ## Consequences
 

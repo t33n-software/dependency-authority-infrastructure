@@ -92,6 +92,12 @@ module "workload_image_registries" {
   format        = "DOCKER"
   mode          = "STANDARD_REPOSITORY"
 
+  # The declared, platform-executed workload image lifecycle: the organization
+  # instance binds the canonical convention values and the dry-run activation
+  # state; the core never presets them.
+  cleanup_policies       = var.workload_image_cleanup[each.key].policies
+  cleanup_policy_dry_run = var.workload_image_cleanup[each.key].dry_run
+
   labels = {
     boundary = "dependency-authority"
     zone     = "control"
