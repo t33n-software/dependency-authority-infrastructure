@@ -47,6 +47,7 @@ resource "google_compute_network" "workload" {
 
   project                 = var.project_id
   name                    = var.workload_network.network_name
+  description             = var.workload_network.network_description
   auto_create_subnetworks = false
 }
 
@@ -55,6 +56,7 @@ resource "google_compute_subnetwork" "workload" {
 
   project                  = var.project_id
   name                     = var.workload_network.subnet_name
+  description              = var.workload_network.subnet_description
   region                   = var.workload_network.region
   network                  = google_compute_network.workload[0].id
   ip_cidr_range            = var.workload_network.subnet_cidr
@@ -68,6 +70,7 @@ resource "google_dns_response_policy" "workload" {
   count = var.workload_network != null ? 1 : 0
 
   project              = var.project_id
+  description          = var.workload_network.dns_policy_description
   response_policy_name = "${var.workload_network.network_name}-restricted-googleapis"
 
   networks {
@@ -123,11 +126,12 @@ resource "google_dns_response_policy_rule" "restricted_pkg_dev" {
 resource "google_compute_firewall" "allow_restricted_googleapis_egress" {
   count = var.workload_network != null ? 1 : 0
 
-  project   = var.project_id
-  name      = "${var.workload_network.network_name}-allow-restricted-googleapis"
-  network   = google_compute_network.workload[0].id
-  direction = "EGRESS"
-  priority  = 999
+  project     = var.project_id
+  name        = "${var.workload_network.network_name}-allow-restricted-googleapis"
+  description = var.workload_network.firewall_allow_description
+  network     = google_compute_network.workload[0].id
+  direction   = "EGRESS"
+  priority    = 999
 
   destination_ranges = ["199.36.153.4/30"]
 
@@ -140,11 +144,12 @@ resource "google_compute_firewall" "allow_restricted_googleapis_egress" {
 resource "google_compute_firewall" "deny_all_egress" {
   count = var.workload_network != null ? 1 : 0
 
-  project   = var.project_id
-  name      = "${var.workload_network.network_name}-deny-all-egress"
-  network   = google_compute_network.workload[0].id
-  direction = "EGRESS"
-  priority  = 1001
+  project     = var.project_id
+  name        = "${var.workload_network.network_name}-deny-all-egress"
+  description = var.workload_network.firewall_deny_description
+  network     = google_compute_network.workload[0].id
+  direction   = "EGRESS"
+  priority    = 1001
 
   destination_ranges = ["0.0.0.0/0"]
 

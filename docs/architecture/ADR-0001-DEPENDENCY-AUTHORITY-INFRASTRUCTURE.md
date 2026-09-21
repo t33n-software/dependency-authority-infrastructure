@@ -303,6 +303,30 @@ infrastructure core.
      definition unknown and the recovery guarantee must be total within the
      zone boundary; the behavioral rejection proofs of the binding live
      beside every stack.
+ 16. Every managed resource of the declaration plane declares the canonical
+     human-readable description surface of its provider schema (the mandatory
+     description duty of the mandatory resource properties convention): the
+     network module exposes the description surfaces of the workload network
+     origin as optional inputs (the VPC and the subnetwork as create-only
+     surfaces, the egress firewall pair and the restricted-range DNS response
+     policy as in-place surfaces — the DNS response policy rules expose no
+     description surface in the pinned provider schema, proven through `tofu
+     providers schema -json`, and are never bound), and the control stack
+     binds them as required instance-supplied values, never stack defaults:
+     the create-only surfaces byte-exact to the live values at the
+     convergence window (a missing or diverging declaration there forces
+     recreation and is a blocking defect, never a cosmetic drift), the
+     in-place surfaces as the canonical forms normalized through the reviewed
+     plan-gated change. The workload-identity module binds the trigger
+     identity display name to its identity class name, and the control stack
+     binds the pool display and description surfaces, the audit sink
+     description and the per-controller display name and description —
+     required and validated fail-closed. The forbidden escape forms of the
+     convention stay forbidden: no `lifecycle ignore_changes` on a mandatory
+     property, and no computed description form on a create-only surface. The
+     behavioral proofs live beside the code: the module fixture proves the
+     binding offline, and the stack fixture proves the fail-closed form in
+     the governed execution window.
 
 ## Consequences
 

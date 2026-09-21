@@ -2056,6 +2056,190 @@ func TestControlStackBindsTheWorkloadImageCleanupLifecycle(t *testing.T) {
 	}
 }
 
+func TestControlStackBindsTheMandatoryDescriptionSurfaces(t *testing.T) {
+	// The mandatory resource properties convention: every managed resource
+	// declares the canonical human-readable description surface of its provider
+	// schema. The network module exposes the five description surfaces of the
+	// workload network origin as optional inputs (null when unbound); the
+	// control stack binds them as required instance-supplied values — the
+	// create-only VPC and subnetwork descriptions byte-exact to the live
+	// values, the in-place surfaces as the canonical forms.
+	moduleVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "network", "variables.tf")))
+	for _, required := range []string{
+		`network_description = optional(string, null)`,
+		`subnet_description = optional(string, null)`,
+		`firewall_allow_description = optional(string, null)`,
+		`firewall_deny_description = optional(string, null)`,
+		`dns_policy_description = optional(string, null)`,
+		`description == null || length(description) > 0`,
+	} {
+		if !strings.Contains(moduleVariables, required) {
+			t.Fatalf("modules/network/variables.tf does not bind the mandatory description surface element %q", required)
+		}
+	}
+
+	moduleMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "network", "main.tf")))
+	for _, required := range []string{
+		`description = var.workload_network.network_description`,
+		`description = var.workload_network.subnet_description`,
+		`description = var.workload_network.firewall_allow_description`,
+		`description = var.workload_network.firewall_deny_description`,
+		`description = var.workload_network.dns_policy_description`,
+	} {
+		if !strings.Contains(moduleMain, required) {
+			t.Fatalf("modules/network/main.tf does not wire the mandatory description surface %q", required)
+		}
+	}
+	// Exactly the five managed surfaces of the workload network origin carry
+	// the binding: the VPC, the subnetwork, the egress firewall pair and the
+	// restricted-range DNS response policy; the DNS response policy rules
+	// expose no description surface in the pinned provider schema (google
+	// 7.44.0, proven through `tofu providers schema -json`), so the duty never
+	// binds them.
+	if count := strings.Count(moduleMain, "description = var.workload_network."); count != 5 {
+		t.Fatalf("modules/network/main.tf carries %d description wirings of the workload network origin, want exactly 5", count)
+	}
+
+	// The behavioral proof of the description duty lives beside the module and
+	// executes offline (the module carries no backend and no encryption block).
+	moduleFixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "network", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`run "accepts_the_bound_description_surfaces"`,
+		`run "rejects_an_empty_description"`,
+		`expect_failures = [var.workload_network]`,
+	} {
+		if !strings.Contains(moduleFixture, required) {
+			t.Fatalf("modules/network/variables.tofutest.hcl does not carry the description duty proof element %q", required)
+		}
+	}
+
+	// The control stack binds the five surfaces as required instance-supplied
+	// values — never optional, never a stack default — with the non-empty
+	// validation bound fail-closed.
+	controlVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tf")))
+	start := strings.Index(controlVariables, `variable "workload_network" {`)
+	if start < 0 {
+		t.Fatal("stacks/dep-control/variables.tf does not carry the workload_network input")
+	}
+	segment := controlVariables[start:]
+	if next := strings.Index(segment, ` variable "`); next > 0 {
+		segment = segment[:next]
+	}
+	for _, required := range []string{
+		`network_description = string`,
+		`subnet_description = string`,
+		`firewall_allow_description = string`,
+		`firewall_deny_description = string`,
+		`dns_policy_description = string`,
+		`length(var.workload_network.network_description) > 0`,
+		`length(var.workload_network.subnet_description) > 0`,
+		`length(var.workload_network.firewall_allow_description) > 0`,
+		`length(var.workload_network.firewall_deny_description) > 0`,
+		`length(var.workload_network.dns_policy_description) > 0`,
+	} {
+		if !strings.Contains(segment, required) {
+			t.Fatalf("stacks/dep-control/variables.tf does not bind the mandatory description surface element %q", required)
+		}
+	}
+	if strings.Contains(segment, "optional(") {
+		t.Fatal("stacks/dep-control/variables.tf carries an optional description surface of the workload network origin; the control zone binds every surface as a required instance-supplied value")
+	}
+
+	// The identity surfaces of the control zone: the trigger identity carries
+	// its identity class name as the display name, and every controller
+	// identity binds its display name and description as required values.
+	identityMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "workload-identity", "main.tf")))
+	triggerStart := strings.Index(identityMain, `resource "google_service_account" "trigger"`)
+	if triggerStart < 0 {
+		t.Fatal("modules/workload-identity/main.tf does not create the dedicated trigger identities")
+	}
+	triggerSegment := identityMain[triggerStart:]
+	if next := strings.Index(triggerSegment, ` resource "`); next > 0 {
+		triggerSegment = triggerSegment[:next]
+	}
+	if !strings.Contains(triggerSegment, `display_name = each.value.trigger_service_account_id`) {
+		t.Fatal("modules/workload-identity/main.tf does not bind the trigger identity display name to its identity class name")
+	}
+
+	controllersStart := strings.Index(controlVariables, `variable "controllers" {`)
+	if controllersStart < 0 {
+		t.Fatal("stacks/dep-control/variables.tf does not carry the controllers input")
+	}
+	controllersSegment := controlVariables[controllersStart:]
+	if next := strings.Index(controllersSegment, ` variable "`); next > 0 {
+		controllersSegment = controllersSegment[:next]
+	}
+	for _, required := range []string{
+		`display_name = string`,
+		`description = string`,
+		`length(controller.display_name) > 0 && length(controller.description) > 0`,
+	} {
+		if !strings.Contains(controllersSegment, required) {
+			t.Fatalf("stacks/dep-control/variables.tf does not bind the controller description surface element %q", required)
+		}
+	}
+	if strings.Contains(controllersSegment, `display_name = optional(`) || strings.Contains(controllersSegment, `description = optional(`) {
+		t.Fatal("stacks/dep-control/variables.tf carries an optional controller display or description surface; every controller identity binds both as required values")
+	}
+
+	// The control stack wires the pool and audit sink description surfaces.
+	controlMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "main.tf")))
+	for _, required := range []string{
+		`pool_display_name = var.pool_id`,
+		`pool_description = local.workload_identity_pool_description`,
+		`description = local.audit_sink_description`,
+	} {
+		if !strings.Contains(controlMain, required) {
+			t.Fatalf("stacks/dep-control/main.tf does not wire the description surface %q", required)
+		}
+	}
+
+	// The behavioral proofs of the stack bindings live beside the code.
+	fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`network_description = "Zone workload network origin."`,
+		`run "accepts_the_description_surface_bindings"`,
+		`run "rejects_an_empty_network_description"`,
+		`run "rejects_an_identity_without_the_description_surfaces"`,
+		`expect_failures = [var.controllers]`,
+	} {
+		if !strings.Contains(fixture, required) {
+			t.Fatalf("stacks/dep-control/variables.tofutest.hcl does not carry the description duty proof element %q", required)
+		}
+	}
+
+	// The documentation surfaces carry the duty: the module and stack READMEs,
+	// the architecture decision record and the register.
+	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "network", "README.md"))
+	for _, required := range []string{"mandatory resource properties convention", "create-only", "byte-exact"} {
+		if !strings.Contains(moduleReadme, required) {
+			t.Fatalf("the network module README does not document %q of the mandatory description duty", required)
+		}
+	}
+	stackReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-control", "README.md"))
+	for _, required := range []string{"mandatory resource properties convention", "byte-exact", "display name and description"} {
+		if !strings.Contains(stackReadme, required) {
+			t.Fatalf("the dep-control stack README does not document %q of the mandatory description duty", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"mandatory resource properties convention",
+		"create-only",
+		"byte-exact",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the mandatory description duty element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-27") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-27")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {
