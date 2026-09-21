@@ -1,8 +1,8 @@
 # The behavioral proofs of the dep-evidence root: the corrected
-# state_bucket_name validation and the workload-job activation gate — the
-# acceptance paths through assertions and the rejection paths through
-# expect_failures — every run is a plan with refresh disabled, and no run
-# creates infrastructure.
+# state_bucket_name validation, the workload-job activation gate and the
+# recovery binding — the acceptance paths through assertions and the
+# rejection paths through expect_failures — every run is a plan with refresh
+# disabled, and no run creates infrastructure.
 #
 # The root carries the gcs backend binding and the dual-fortress encryption
 # block, so its initialization resolves the state bucket and the encryption
@@ -46,6 +46,11 @@ variables {
   forensics_group = "group:dep-forensics-readers@example.com"
 
   enabled_workload_jobs = ["dep-evidence-write", "dep-evidence-audit"]
+
+  break_glass_recovery = {
+    role               = "roles/resourcemanager.projectIamAdmin"
+    condition_end_time = "2027-01-01T00:00:00Z"
+  }
 }
 
 run "accepts_a_valid_state_bucket_name" {
@@ -146,4 +151,21 @@ run "rejects_an_unknown_enabled_job" {
   }
 
   expect_failures = [var.enabled_workload_jobs]
+}
+
+run "rejects_an_invalid_recovery_end_time" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    break_glass_recovery = {
+      role               = "roles/resourcemanager.projectIamAdmin"
+      condition_end_time = "not-a-timestamp"
+    }
+  }
+
+  expect_failures = [var.break_glass_recovery]
 }

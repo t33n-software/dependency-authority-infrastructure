@@ -22,3 +22,8 @@ output "enforced_constraints" {
   description = "Organization-policy constraints enforced on the quarantine project."
   value       = module.policy_bindings.enforced_constraints
 }
+
+output "break_glass_recovery_service_account_email" {
+  description = "Email of the time-bound recovery identity of the quarantine zone (dep-break-glass-recovery)."
+  value       = module.recovery.service_account_email
+}

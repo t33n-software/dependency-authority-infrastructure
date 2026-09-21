@@ -776,69 +776,93 @@ func TestStacksBindTheWorkloadJobActivationGate(t *testing.T) {
 	}
 }
 
-func TestControlStackDeclaresTheBreakGlassRecovery(t *testing.T) {
-	// The control zone declares the recovery identity through the recovery
-	// module: the dedicated identity whose elevated project role exists only
-	// under the mandatory time-bound IAM condition, with the role and the end
-	// time as approved instance decisions.
-	controlMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "main.tf")))
+func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
+	// Every trust zone declares its own break-glass recovery identity through
+	// the recovery module, bound to the zone's own project: the dedicated,
+	// dormant identity whose elevated project role exists only under the
+	// mandatory time-bound IAM condition, with the role and the end time as
+	// approved instance decisions.
+	for _, stack := range stackNames {
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		if count := strings.Count(main, `module "recovery" {`); count != 1 {
+			t.Fatalf("stacks/%s/main.tf declares the recovery binding %d times, want exactly once", stack, count)
+		}
+		for _, required := range []string{
+			`source = "../../modules/recovery"`,
+			`project_id = var.project_id`,
+			`role = var.break_glass_recovery.role`,
+			`condition_end_time = var.break_glass_recovery.condition_end_time`,
+		} {
+			if !strings.Contains(main, required) {
+				t.Fatalf("stacks/%s/main.tf does not declare the recovery binding element %q", stack, required)
+			}
+		}
+
+		variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf")))
+		start := strings.Index(variables, `variable "break_glass_recovery" {`)
+		if start < 0 {
+			t.Fatalf("stacks/%s/variables.tf does not carry the break_glass_recovery input", stack)
+		}
+		segment := variables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if strings.Contains(segment, "default") {
+			t.Fatalf("stacks/%s/variables.tf carries a default for break_glass_recovery; the role and the end time are approved instance decisions, never stack defaults", stack)
+		}
+		for _, required := range []string{
+			`role = string`,
+			`condition_end_time = string`,
+			`can(regex("^roles/[A-Za-z][A-Za-z0-9._]+$", var.break_glass_recovery.role))`,
+			`can(timecmp(var.break_glass_recovery.condition_end_time, "1970-01-01T00:00:00Z"))`,
+		} {
+			if !strings.Contains(segment, required) {
+				t.Fatalf("stacks/%s/variables.tf does not bind the recovery element %q", stack, required)
+			}
+		}
+
+		outputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "outputs.tf")))
+		if !strings.Contains(outputs, `output "break_glass_recovery_service_account_email"`) {
+			t.Fatalf("stacks/%s/outputs.tf does not export the recovery identity email", stack)
+		}
+		if !strings.Contains(outputs, `value = module.recovery.service_account_email`) {
+			t.Fatalf("stacks/%s/outputs.tf does not wire the recovery identity email to the module", stack)
+		}
+
+		// The behavioral proof of the recovery binding lives beside the code.
+		fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tofutest.hcl")))
+		if !strings.Contains(fixture, "break_glass_recovery = {") {
+			t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the synthetic recovery binding", stack)
+		}
+		if !strings.Contains(fixture, "expect_failures = [var.break_glass_recovery]") {
+			t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the rejection run of the recovery binding", stack)
+		}
+
+		readme := readRepositoryFile(t, filepath.Join("stacks", stack, "README.md"))
+		if !strings.Contains(readme, "break_glass_recovery") {
+			t.Fatalf("the %s stack README does not document the break_glass_recovery input", stack)
+		}
+		if !strings.Contains(readme, "recovery identity") {
+			t.Fatalf("the %s stack README does not document the recovery identity boundary", stack)
+		}
+	}
+
+	// The architecture decision record carries the per-zone decision.
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
 	for _, required := range []string{
-		`module "recovery" {`,
-		`source = "../../modules/recovery"`,
-		`role = var.break_glass_recovery.role`,
-		`condition_end_time = var.break_glass_recovery.condition_end_time`,
+		"Every trust zone",
+		"break-glass recovery identity",
+		"one per zone project",
 	} {
-		if !strings.Contains(controlMain, required) {
-			t.Fatalf("stacks/dep-control/main.tf does not declare the recovery binding element %q", required)
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the per-zone recovery decision element %q", required)
 		}
-	}
-
-	controlVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tf")))
-	start := strings.Index(controlVariables, `variable "break_glass_recovery" {`)
-	if start < 0 {
-		t.Fatal("stacks/dep-control/variables.tf does not carry the break_glass_recovery input")
-	}
-	segment := controlVariables[start:]
-	if next := strings.Index(segment, ` variable "`); next > 0 {
-		segment = segment[:next]
-	}
-	if strings.Contains(segment, "default") {
-		t.Fatal("stacks/dep-control/variables.tf carries a default for break_glass_recovery; the role and the end time are approved instance decisions, never stack defaults")
-	}
-	for _, required := range []string{
-		`role = string`,
-		`condition_end_time = string`,
-		`can(timecmp(var.break_glass_recovery.condition_end_time, "1970-01-01T00:00:00Z"))`,
-	} {
-		if !strings.Contains(segment, required) {
-			t.Fatalf("stacks/dep-control/variables.tf does not bind the recovery element %q", required)
-		}
-	}
-
-	controlOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "outputs.tf")))
-	if !strings.Contains(controlOutputs, `output "break_glass_recovery_service_account_email"`) {
-		t.Fatal("stacks/dep-control/outputs.tf does not export the recovery identity email")
-	}
-
-	// Zone purity: no other stack ever declares the recovery identity.
-	for _, stack := range []string{"dep-intake", "dep-evidence", "dep-approved", "dep-quarantine"} {
-		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
-		if strings.Contains(main, "modules/recovery") {
-			t.Fatalf("stacks/%s must never declare the recovery identity; the recovery binding lives exactly once in dep-control", stack)
-		}
-		variables := readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf"))
-		if strings.Contains(variables, "break_glass_recovery") {
-			t.Fatalf("stacks/%s/variables.tf must never carry the recovery binding; it lives exactly once in dep-control", stack)
-		}
-	}
-
-	// The behavioral proof of the recovery binding lives beside the code.
-	fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tofutest.hcl")))
-	if !strings.Contains(fixture, "expect_failures = [var.break_glass_recovery]") {
-		t.Fatal("stacks/dep-control/variables.tofutest.hcl does not carry the rejection run of the recovery binding")
 	}
 
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-26") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-26")
+	}
 	if !strings.Contains(traceability, "DAI-24") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-24")
 	}
