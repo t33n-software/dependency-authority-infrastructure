@@ -60,9 +60,10 @@ resource "google_service_account" "this" {
 resource "google_service_account" "trigger" {
   for_each = var.identities
 
-  project     = var.project_id
-  account_id  = each.value.trigger_service_account_id
-  description = "Invoke-only trigger identity of the lane; holds invoke permission on exactly its own workload job and never a data-plane role."
+  project      = var.project_id
+  account_id   = each.value.trigger_service_account_id
+  display_name = each.value.trigger_service_account_id
+  description  = "Invoke-only trigger identity of the lane; holds invoke permission on exactly its own workload job and never a data-plane role."
 }
 
 resource "google_service_account_iam_member" "workload_identity_user" {

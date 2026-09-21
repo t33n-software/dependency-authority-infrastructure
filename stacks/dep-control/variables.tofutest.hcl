@@ -17,39 +17,54 @@ variables {
   location   = "europe-west1"
 
   workload_network = {
-    network_name = "dep-control-workload"
-    subnet_name  = "dep-control-workload-europe-west1"
-    subnet_cidr  = "10.10.0.0/26"
+    network_name               = "dep-control-workload"
+    subnet_name                = "dep-control-workload-europe-west1"
+    subnet_cidr                = "10.10.0.0/26"
+    network_description        = "Zone workload network origin."
+    subnet_description         = "Zone workload subnetwork."
+    firewall_allow_description = "Allow egress TCP 443 to the restricted range."
+    firewall_deny_description  = "Deny all remaining egress."
+    dns_policy_description     = "Restricted-range DNS form."
   }
 
   controllers = {
     admission = {
       provider_id         = "github-admission"
       service_account_id  = "dep-admission-controller"
+      display_name        = "dep-admission-controller"
+      description         = "Execution identity of the admission lane."
       attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-admission'"
       principal_value     = "example/dependency-authority"
     }
     promotion = {
       provider_id         = "github-promotion"
       service_account_id  = "dep-approved-promoter"
+      display_name        = "dep-approved-promoter"
+      description         = "Execution identity of the promotion lane."
       attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-promotion'"
       principal_value     = "example/dependency-authority"
     }
     revalidation = {
       provider_id         = "github-revalidation"
       service_account_id  = "dep-revalidation-controller"
+      display_name        = "dep-revalidation-controller"
+      description         = "Execution identity of the revalidation lane."
       attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-revalidation'"
       principal_value     = "example/dependency-authority"
     }
     revocation = {
       provider_id         = "github-revocation"
       service_account_id  = "dep-revocation-controller"
+      display_name        = "dep-revocation-controller"
+      description         = "Execution identity of the revocation lane."
       attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-revocation'"
       principal_value     = "example/dependency-authority"
     }
     consumer-verification = {
       provider_id         = "github-consumer-verification"
       service_account_id  = "dep-consumer-verifier"
+      display_name        = "dep-consumer-verifier"
+      description         = "Execution identity of the consumer verification lane."
       attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-consumer-verification'"
       principal_value     = "example/dependency-authority"
     }
@@ -375,4 +390,100 @@ run "rejects_a_staging_binding_without_the_keep_floor" {
   }
 
   expect_failures = [var.workload_image_cleanup]
+}
+
+run "accepts_the_description_surface_bindings" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.workload_network.network_description == "Zone workload network origin."
+    error_message = "The workload network origin must bind the canonical description surface."
+  }
+
+  assert {
+    condition     = var.controllers["admission"].description == "Execution identity of the admission lane."
+    error_message = "Every controller identity must bind its canonical description surface."
+  }
+}
+
+run "rejects_an_empty_network_description" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    workload_network = {
+      network_name               = "dep-control-workload"
+      subnet_name                = "dep-control-workload-europe-west1"
+      subnet_cidr                = "10.10.0.0/26"
+      network_description        = ""
+      subnet_description         = "Zone workload subnetwork."
+      firewall_allow_description = "Allow egress TCP 443 to the restricted range."
+      firewall_deny_description  = "Deny all remaining egress."
+      dns_policy_description     = "Restricted-range DNS form."
+    }
+  }
+
+  expect_failures = [var.workload_network]
+}
+
+run "rejects_an_identity_without_the_description_surfaces" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    controllers = {
+      admission = {
+        provider_id         = "github-admission"
+        service_account_id  = "dep-admission-controller"
+        display_name        = ""
+        description         = "Execution identity of the admission lane."
+        attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-admission'"
+        principal_value     = "example/dependency-authority"
+      }
+      promotion = {
+        provider_id         = "github-promotion"
+        service_account_id  = "dep-approved-promoter"
+        display_name        = "dep-approved-promoter"
+        description         = "Execution identity of the promotion lane."
+        attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-promotion'"
+        principal_value     = "example/dependency-authority"
+      }
+      revalidation = {
+        provider_id         = "github-revalidation"
+        service_account_id  = "dep-revalidation-controller"
+        display_name        = "dep-revalidation-controller"
+        description         = "Execution identity of the revalidation lane."
+        attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-revalidation'"
+        principal_value     = "example/dependency-authority"
+      }
+      revocation = {
+        provider_id         = "github-revocation"
+        service_account_id  = "dep-revocation-controller"
+        display_name        = "dep-revocation-controller"
+        description         = "Execution identity of the revocation lane."
+        attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-revocation'"
+        principal_value     = "example/dependency-authority"
+      }
+      consumer-verification = {
+        provider_id         = "github-consumer-verification"
+        service_account_id  = "dep-consumer-verifier"
+        display_name        = "dep-consumer-verifier"
+        description         = "Execution identity of the consumer verification lane."
+        attribute_condition = "assertion.repository == 'example/dependency-authority' && assertion.environment == 'dep-consumer-verification'"
+        principal_value     = "example/dependency-authority"
+      }
+    }
+  }
+
+  expect_failures = [var.controllers]
 }

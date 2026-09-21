@@ -20,7 +20,12 @@ the execution identity.
   (`service_account_id`) carries the data-plane roles and is never federated
   from CI, and the invoke-only trigger identity (`trigger_service_account_id`)
   receives the principal-set binding and holds invoke permission on exactly
-  its own workload job — never a data-plane role.
+  its own workload job — never a data-plane role. Both identities bind their
+  canonical human-readable description surfaces (the mandatory description
+  duty of the mandatory resource properties convention): the trigger identity
+  carries its identity class name as the display name and the canonical
+  invoke-only description, and the execution identity binds its display name
+  and description through the identity input.
 - No service-account keys are created anywhere; identities are short-lived
   OIDC exchanges only.
 

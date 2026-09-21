@@ -48,14 +48,24 @@ variable "workload_network" {
     workload job of the zone attaches to this network with Direct VPC egress
     and all-traffic routing; without it the job's calls to the restricted
     planes present no in-perimeter network origin and fail closed at the
-    perimeter. All values are instance-supplied; the core never carries a
-    default.
+    perimeter. Every managed surface of the origin binds its canonical
+    human-readable description through the optional description fields (the
+    mandatory description duty of the mandatory resource properties
+    convention): the VPC and the subnetwork (create-only surfaces, bound
+    byte-exact to the live values at convergence), the egress firewall pair
+    and the restricted-range DNS response policy (in-place surfaces). All
+    values are instance-supplied; the core never carries a default.
   EOT
   type = object({
-    network_name = string
-    subnet_name  = string
-    region       = string
-    subnet_cidr  = string
+    network_name               = string
+    subnet_name                = string
+    region                     = string
+    subnet_cidr                = string
+    network_description        = optional(string, null)
+    subnet_description         = optional(string, null)
+    firewall_allow_description = optional(string, null)
+    firewall_deny_description  = optional(string, null)
+    dns_policy_description     = optional(string, null)
   })
   default = null
 
@@ -67,5 +77,22 @@ variable "workload_network" {
       can(cidrhost(var.workload_network.subnet_cidr, 0))
     )
     error_message = "workload_network must bind a valid network name, subnetwork name, region and subnet CIDR range."
+  }
+
+  # The mandatory description duty of the mandatory resource properties
+  # convention: every managed surface of the workload network origin binds the
+  # canonical human-readable description surface of its provider schema. A
+  # bound description is never empty; an unbound surface binds null.
+  validation {
+    condition = var.workload_network == null || alltrue([
+      for description in [
+        var.workload_network.network_description,
+        var.workload_network.subnet_description,
+        var.workload_network.firewall_allow_description,
+        var.workload_network.firewall_deny_description,
+        var.workload_network.dns_policy_description,
+      ] : description == null || length(description) > 0
+    ])
+    error_message = "every bound description surface of the workload network origin must be non-empty; an unbound surface binds null."
   }
 }

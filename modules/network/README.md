@@ -8,7 +8,17 @@ origin — the VPC substrate every workload job of the zone attaches to.
 
 - Never carries organization, tenant, identity, secret or registry bindings;
   zone names, DNS names, VPC self links, records and the workload network
-  names, region and CIDR are instance-supplied values.
+  names, region, CIDR and description values are instance-supplied values.
+- Every managed surface of the workload network origin binds the canonical
+  human-readable description surface of its provider schema (the mandatory
+  description duty of the mandatory resource properties convention): the VPC
+  and the subnetwork are create-only surfaces — a pre-existing live value is
+  bound byte-exact at the convergence window, and a missing or diverging
+  declaration forces recreation — while the egress firewall pair and the
+  restricted-range DNS response policy are in-place surfaces governed through
+  the reviewed plan-gated change. The DNS response policy rules expose no
+  description surface in the pinned provider schema (google 7.44.0, proven
+  through `tofu providers schema -json`), so the duty never binds them.
 - The workload network origin surface creates exactly one VPC with one
   subnetwork in the job region carrying Private Google Access, the
   restricted-range DNS response policy (`*.googleapis.com` resolves to

@@ -74,6 +74,16 @@ perimeter ingress rule of the class.
   (`run.allowedVPCEgress` allows only all-traffic, `run.allowedIngress`
   allows only internal). A job without the zone network attachment presents
   no in-perimeter network origin and fails closed at the perimeter.
+- Every managed surface of the zone workload network origin binds its
+  canonical human-readable description (the mandatory description duty of the
+  mandatory resource properties convention): the VPC and subnetwork
+  descriptions are create-only surfaces bound byte-exact to the live values
+  at the convergence window, and the firewall pair and DNS response policy
+  descriptions are in-place surfaces — all bound through the required
+  `workload_network` input fields, never stack defaults. The zone workload
+  identity pool and the audit sink carry their canonical intent descriptions,
+  and every controller identity binds its display name and description as
+  instance-bound values.
 - Each lane federates to the dedicated invoke-only trigger identity of its
   job, never to the execution identity; a trigger identity holds invoke on
   exactly its own job and no data-plane grant.
@@ -95,8 +105,9 @@ perimeter ingress rule of the class.
 
 ## Inputs
 
-`project_id`, `location`, `pool_id`, `controllers` (OIDC bindings of the
-controller identities), `workload_job_images` (the instance-bound image
+`project_id`, `location`, `pool_id`, `controllers` (the OIDC bindings and the
+canonical display name and description surfaces of the controller
+identities), `workload_job_images` (the instance-bound image
 digests keyed by canonical job name), `workload_image_cleanup` (the
 instance-bound lifecycle binding of the two workload image registries: the
 per-class cleanup policies and the dry-run activation state),
@@ -106,7 +117,10 @@ jobs plus the jobs being provisioned in the current window),
 `break_glass_recovery` (the approved recovery binding of the control zone:
 the project-level role under the mandatory time-bound IAM condition and the
 RFC 3339 end time), `workload_network` (the instance-bound
-zone VPC names and CIDR), `cross_zone_workload_reader_members`
+zone VPC names and CIDR plus the canonical description surfaces of every
+managed network surface: the create-only VPC and subnetwork descriptions
+bound byte-exact to the live values, the in-place firewall pair and DNS
+response policy descriptions), `cross_zone_workload_reader_members`
 (the matrix-bound readers of the other zones), `forensics_group` (the
 instance-bound forensics reader group), `perimeter_ingress` (the
 instance-bound perimeter rule of the forensics reader access class, declared
