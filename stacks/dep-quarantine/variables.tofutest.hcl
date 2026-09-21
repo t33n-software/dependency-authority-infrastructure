@@ -1,7 +1,8 @@
-# The behavioral proof of the corrected state_bucket_name validation of the
-# dep-quarantine root: the acceptance path through an assertion and the
-# rejection paths through expect_failures — every run is a plan with refresh
-# disabled, and no run creates infrastructure.
+# The behavioral proofs of the dep-quarantine root: the corrected
+# state_bucket_name validation and the recovery binding — the acceptance path
+# through an assertion and the rejection paths through expect_failures —
+# every run is a plan with refresh disabled, and no run creates
+# infrastructure.
 #
 # The root carries the gcs backend binding and the dual-fortress encryption
 # block, so its initialization resolves the state bucket and the encryption
@@ -19,6 +20,11 @@ variables {
   evidence_bucket_name = "test-dep-evidence-archive"
 
   forensics_group = "group:dep-forensics-readers@example.com"
+
+  break_glass_recovery = {
+    role               = "roles/resourcemanager.projectIamAdmin"
+    condition_end_time = "2027-01-01T00:00:00Z"
+  }
 }
 
 run "accepts_a_valid_state_bucket_name" {
@@ -92,4 +98,21 @@ run "rejects_a_bucket_name_with_the_google_substring" {
   }
 
   expect_failures = [var.state_bucket_name]
+}
+
+run "rejects_an_invalid_recovery_end_time" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    break_glass_recovery = {
+      role               = "roles/resourcemanager.projectIamAdmin"
+      condition_end_time = "not-a-timestamp"
+    }
+  }
+
+  expect_failures = [var.break_glass_recovery]
 }

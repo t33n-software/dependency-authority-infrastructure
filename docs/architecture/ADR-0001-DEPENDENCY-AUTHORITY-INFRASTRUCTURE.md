@@ -57,7 +57,7 @@ infrastructure core.
    runtime, and schema version pins for policies and evidence. Instances wire
    the concrete project IDs, regions, OIDC bindings, members and retention
    values as reviewed instance configuration.
-7. The canonical IAM target matrix binds the data-plane roles of the nine
+7. The canonical IAM target matrix binds the data-plane roles of the eight
    zone workload identities at repository scope through
    `modules/repository-iam`, never at project scope, and cross-zone
    authority only through the owning zone's instance-wired member inputs:
@@ -104,9 +104,10 @@ infrastructure core.
                                           reader on release-controller-images
    dep-evidence-auditor         evidence  reader on *-dependencies-evidence;
                                           reader on release-controller-images
-   dep-break-glass-recovery     control   no data-plane grant: time-bounded
+   dep-break-glass-recovery     all zones no data-plane grant: time-bounded
                                           break-glass recovery only, never
-                                          federated from CI
+                                          federated from CI — one dedicated
+                                          identity per zone project
    ```
 
    The matrix binds its exclusions with the same force: the quarantine
@@ -252,13 +253,12 @@ infrastructure core.
     fail-closed image validation keeps an activated job always on a proven
     immutable digest. The activation of a planned surface is a reviewed
     change of the instance binding — the same governed form as every
-    binding change. The control stack additionally declares the recovery
-    identity of the canonical IAM target matrix through the recovery
-    module: the dedicated identity whose elevated project role exists only
-    under the mandatory time-bound IAM condition, never federated from CI
-    and never carrying a data-plane grant, with the role and the end time
-    as approved instance decisions supplied through the
-    `break_glass_recovery` input; no other stack ever declares it.
+    binding change. Every zone stack declares the recovery identity of its
+    zone through the recovery module (decision 15): the dedicated identity
+    whose elevated project role exists only under the mandatory time-bound
+    IAM condition, never federated from CI and never carrying a data-plane
+    grant, with the role and the end time as approved instance decisions
+    supplied through the `break_glass_recovery` input.
 14. The workload image registries carry the declared, platform-executed
     workload image lifecycle of the workload image lifecycle and retention
     convention: the artifact-registry module owns the cleanup policy surface
@@ -286,6 +286,23 @@ infrastructure core.
     purity), and the behavioral proofs live beside the code: the module
     fixture proves the class rule offline, and the stack fixture proves the
     structural rules in the governed execution window.
+ 15. Every trust zone carries its own break-glass recovery identity — five
+     zones, five dedicated identities, exactly one per zone project, each
+     declared by the zone's own stack through the recovery module and bound
+     to that project. The identity is standing but dormant: never used in
+     normal operation, never federated from CI and never carrying a
+     data-plane grant; its elevated project role exists only under the
+     mandatory time-bound IAM condition, and an unbounded grant is a
+     contract violation. The role and the end time are approved instance
+     decisions supplied through the `break_glass_recovery` input of every
+     zone stack (never stack defaults), and every re-binding of the end
+     time is a reviewed instance change. The identity is not a fourth
+     operator access class: the JIT window is the planned mutation path,
+     the break-glass identity is the disaster path. A zone never depends on
+     another zone's recovery surface, because the disaster form is by
+     definition unknown and the recovery guarantee must be total within the
+     zone boundary; the behavioral rejection proofs of the binding live
+     beside every stack.
 
 ## Consequences
 

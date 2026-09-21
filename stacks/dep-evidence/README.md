@@ -59,6 +59,12 @@ diagnostic bindings of the forensics reader access class on the zone project.
   (instance-supplied) holds exactly `roles/logging.viewer` and
   `roles/run.viewer` on this zone project and no other grant — the read-only
   diagnostic bindings are declared through the forensics-readers module.
+- The recovery identity of the evidence zone: the stack declares the
+  dedicated identity through the recovery module — its elevated project role
+  exists only under the mandatory time-bound IAM condition, it is never used
+  in normal operation and never federated from CI, and it holds no
+  data-plane grant. The role and the end time are approved instance
+  decisions, supplied through the `break_glass_recovery` input.
 - The stack consumes the zone state home — the dedicated state bucket of the
   zone holding that zone's root states and nothing else — through the final
   `gcs` backend binding with the state-key grammar prefix identifying exactly
@@ -74,7 +80,9 @@ diagnostic bindings of the forensics reader access class on the zone project.
 instance-bound image digests keyed by canonical job name),
 `enabled_workload_jobs` (the instance-bound activation set of the zone's
 workload jobs: exactly the bound jobs plus the jobs being provisioned in the
-current window), `workload_network` (the instance-bound zone VPC names and
+current window), `break_glass_recovery` (the approved recovery binding of the
+evidence zone: the project-level role under the mandatory time-bound IAM
+condition and the RFC 3339 end time), `workload_network` (the instance-bound zone VPC names and
 CIDR), `archive_bucket_name`,
 `retention_period_seconds`, `lock_retention_policy`,
 optional `archive_kms_key_name`, the matrix-bound `additional_writer_members`
@@ -91,5 +99,5 @@ Evidence repository IDs per ecosystem, the archive bucket name (consumed by
 the other zone stacks), writer and auditor service account emails and their
 invoke-only trigger identity emails, the pool resource name, the audit sink
 writer identity, the enforced policy constraints, the workload job resource
-IDs keyed by canonical job name and the workload network and subnetwork
-resource IDs.
+IDs keyed by canonical job name, the workload network and subnetwork
+resource IDs and the recovery identity email.

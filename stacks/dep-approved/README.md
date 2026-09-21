@@ -33,6 +33,12 @@ bindings of the forensics reader access class on the zone project.
   (instance-supplied) holds exactly `roles/logging.viewer` and
   `roles/run.viewer` on this zone project and no other grant — the read-only
   diagnostic bindings are declared through the forensics-readers module.
+- The recovery identity of the approved zone: the stack declares the
+  dedicated identity through the recovery module — its elevated project role
+  exists only under the mandatory time-bound IAM condition, it is never used
+  in normal operation and never federated from CI, and it holds no
+  data-plane grant. The role and the end time are approved instance
+  decisions, supplied through the `break_glass_recovery` input.
 - The stack consumes the zone state home — the dedicated state bucket of the
   zone holding that zone's root states and nothing else — through the final
   `gcs` backend binding with the state-key grammar prefix identifying exactly
@@ -46,7 +52,9 @@ bindings of the forensics reader access class on the zone project.
 `project_id`, `location`, `ecosystems` (default `["go"]`), `pool_id`,
 `identities` (default empty), the matrix-bound member inputs
 `promoter_member`, `revocation_member` and `revalidation_reader_member`,
-`consumer_members`, `forensics_group` (the instance-bound forensics reader
+`consumer_members`, `break_glass_recovery` (the approved recovery binding of
+the approved zone: the project-level role under the mandatory time-bound IAM
+condition and the RFC 3339 end time), `forensics_group` (the instance-bound forensics reader
 group), `evidence_bucket_name`, `state_bucket_name` (the instance-bound zone state
 home bucket, provisioned by the converged foundation — never by this stack),
 `state_encryption_key` (the instance-bound engine key reference of this
@@ -56,4 +64,5 @@ root's client-side state and plan encryption), audit sink settings and
 ## Outputs
 
 Repository IDs and consumer endpoint URIs per ecosystem, the pool resource
-name, the audit sink writer identity and the enforced policy constraints.
+name, the audit sink writer identity, the enforced policy constraints and
+the recovery identity email.
