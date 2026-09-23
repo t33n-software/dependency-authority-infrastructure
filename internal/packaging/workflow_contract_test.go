@@ -142,6 +142,7 @@ func TestCanonicalFileFamilyMatchesTheBindingManifest(t *testing.T) {
 		"**/.terraform/",
 		"*.tfstate",
 		"*.tfvars",
+		"window.imports.tf",
 		"modules/**/.terraform.lock.hcl",
 		"policy-bindings/.terraform.lock.hcl",
 	} {

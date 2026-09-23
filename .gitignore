@@ -29,6 +29,9 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# Convergence window import carriers never live in the core
+window.imports.tf
+
 # Provider lock files are committed for the reference stacks only
 modules/**/.terraform.lock.hcl
 policy-bindings/.terraform.lock.hcl
