@@ -324,9 +324,32 @@ infrastructure core.
      required and validated fail-closed. The forbidden escape forms of the
      convention stay forbidden: no `lifecycle ignore_changes` on a mandatory
      property, and no computed description form on a create-only surface. The
-     behavioral proofs live beside the code: the module fixture proves the
-     binding offline, and the stack fixture proves the fail-closed form in
-     the governed execution window.
+      behavioral proofs live beside the code: the module fixture proves the
+      binding offline, and the stack fixture proves the fail-closed form in
+      the governed execution window.
+ 17. Every workload job declaration owns the static, non-credential
+     configuration of the workload completely (the workload configuration
+     ownership convention of the cloud-agnostic dependency authority
+     reference): the control stack consumes the instance-bound
+     `workload_job_env` input — the static environment bindings keyed by the
+     canonical job name, never a stack default — and wires it into the job
+     module (`env = lookup(var.workload_job_env, each.key, {})`), so a value
+     the declaration does not carry is a declaration gap the plan surfaces
+     and a window never applies over an unreviewed configuration diff. The
+     binding is fail-closed: the input references only declared jobs of the
+     zone topology, every key is a well-formed environment name, and no key
+     or value ever carries a credential marker (the workload internal
+     authentication convention binds that no credential material ever
+     travels through an environment variable). Operation inputs travel as
+     validated execution parameters of the invocation, never as baked-in
+     values. The concrete values are organization-instance bindings with
+     binding status planned until the provisioning read-back proof flips
+     them to bound, and every value referencing another bound surface is a
+     proven projection the instance verifier cross-binds fail-closed against
+     its canonical source. The behavioral proofs live beside the code: the
+     stack fixture proves the acceptance run and the rejection runs of an
+     unknown job and a credential-carrying binding in the governed execution
+     window.
 
 ## Consequences
 

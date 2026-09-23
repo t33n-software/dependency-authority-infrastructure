@@ -2240,6 +2240,93 @@ func TestControlStackBindsTheMandatoryDescriptionSurfaces(t *testing.T) {
 	}
 }
 
+func TestControlStackBindsTheWorkloadJobEnvOwnership(t *testing.T) {
+	// The workload configuration ownership convention: the declaration owns
+	// every static, non-credential configuration value of a workload
+	// completely. The control stack consumes the instance-bound
+	// workload_job_env input — never a stack default — and wires it into the
+	// job module; every other stack is pure.
+	controlVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tf")))
+	start := strings.Index(controlVariables, `variable "workload_job_env" {`)
+	if start < 0 {
+		t.Fatal("stacks/dep-control/variables.tf does not carry the workload_job_env input")
+	}
+	segment := controlVariables[start:]
+	if next := strings.Index(segment, ` variable "`); next > 0 {
+		segment = segment[:next]
+	}
+	if strings.Contains(segment, "default") {
+		t.Fatal("stacks/dep-control/variables.tf carries a default for workload_job_env; the static configuration is an instance binding, never a stack default")
+	}
+	for _, required := range []string{
+		`type = map(map(string))`,
+		`length(setsubtract(keys(var.workload_job_env), keys(local.workload_jobs))) == 0`,
+		`can(regex("^[A-Z][A-Z0-9_]*$", key))`,
+		`!can(regex("(?i)(password|secret|token|credential|api[_-]?key|private[_-]?key)", key))`,
+		`!can(regex("(?i)(password|secret|token|credential|api[_-]?key|private[_-]?key)", value))`,
+	} {
+		if !strings.Contains(segment, required) {
+			t.Fatalf("stacks/dep-control/variables.tf does not bind the workload job env ownership element %q", required)
+		}
+	}
+
+	controlMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "main.tf")))
+	if !strings.Contains(controlMain, `env = lookup(var.workload_job_env, each.key, {})`) {
+		t.Fatal("stacks/dep-control/main.tf does not wire the instance-bound env binding into the workload jobs")
+	}
+
+	// Zone purity: no other stack ever carries the binding.
+	for _, stack := range []string{"dep-intake", "dep-evidence", "dep-approved", "dep-quarantine"} {
+		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
+		if strings.Contains(main, "workload_job_env") {
+			t.Fatalf("stacks/%s must never bind the workload job env surface; it lives exactly once in dep-control", stack)
+		}
+		variables := readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf"))
+		if strings.Contains(variables, "workload_job_env") {
+			t.Fatalf("stacks/%s/variables.tf must never carry the workload_job_env binding; it lives exactly once in dep-control", stack)
+		}
+	}
+
+	// The behavioral proofs live beside the stack.
+	fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`workload_job_env = {`,
+		`run "accepts_the_canonical_workload_job_env_binding"`,
+		`run "rejects_an_unknown_job_env_binding"`,
+		`run "rejects_a_credential_carrying_env_binding"`,
+		`expect_failures = [var.workload_job_env]`,
+	} {
+		if !strings.Contains(fixture, required) {
+			t.Fatalf("stacks/dep-control/variables.tofutest.hcl does not carry the workload job env proof element %q", required)
+		}
+	}
+
+	// The documentation surfaces carry the ownership form: the stack README,
+	// the architecture decision record and the register.
+	stackReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-control", "README.md"))
+	for _, required := range []string{"workload_job_env", "configuration ownership", "never a stack default"} {
+		if !strings.Contains(stackReadme, required) {
+			t.Fatalf("the dep-control stack README does not document %q of the workload job env ownership", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"workload configuration ownership",
+		"workload_job_env",
+		"never a stack default",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the workload job env ownership element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-28") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-28")
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {
