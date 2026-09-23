@@ -1069,7 +1069,7 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 			"dep-promotion":             "dep-promotion-trigger",
 			"dep-revalidation":          "dep-revalidation-trigger",
 			"dep-revocation":            "dep-revocation-trigger",
-			"dep-consumer-verification": "dep-consumer-verification-trigger",
+			"dep-consumer-verification": "dep-consumer-verifier-trigger",
 		},
 		"dep-evidence": {
 			"dep-evidence-write": "dep-evidence-write-trigger",
