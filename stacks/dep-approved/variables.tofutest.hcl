@@ -1,8 +1,8 @@
 # The behavioral proofs of the dep-approved root: the corrected
-# state_bucket_name validation and the recovery binding — the acceptance path
-# through an assertion and the rejection paths through expect_failures —
-# every run is a plan with refresh disabled, and no run creates
-# infrastructure.
+# state_bucket_name validation, the instance-bound project number binding and
+# the recovery binding — the acceptance paths through assertions and the
+# rejection paths through expect_failures — every run is a plan with refresh
+# disabled, and no run creates infrastructure.
 #
 # The root carries the gcs backend binding and the dual-fortress encryption
 # block, so its initialization resolves the state bucket and the encryption
@@ -12,8 +12,9 @@
 # file, and every value assigned here is synthetic test data.
 
 variables {
-  project_id = "test-dep-approved"
-  location   = "europe-west1"
+  project_id     = "test-dep-approved"
+  project_number = "100000000040"
+  location       = "europe-west1"
 
   promoter_member            = "serviceAccount:dep-approved-promoter@test-dep-control.iam.gserviceaccount.com"
   revocation_member          = "serviceAccount:dep-revocation-controller@test-dep-control.iam.gserviceaccount.com"
@@ -117,4 +118,31 @@ run "rejects_an_invalid_recovery_end_time" {
   }
 
   expect_failures = [var.break_glass_recovery]
+}
+
+run "accepts_a_numeric_project_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.project_number == "100000000040"
+    error_message = "The validation must accept the numeric Google Cloud project number of the zone."
+  }
+}
+
+run "rejects_a_non_numeric_project_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    project_number = "test-dep-approved"
+  }
+
+  expect_failures = [var.project_number]
 }

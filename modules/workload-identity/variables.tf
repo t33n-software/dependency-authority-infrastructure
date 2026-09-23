@@ -3,6 +3,16 @@ variable "project_id" {
   type        = string
 }
 
+variable "project_number" {
+  description = "Google Cloud project number of the trust zone owning the pool: the pool binds it because the provider state carries the pool's project as the numeric project number (the import and read-back form projects/<number>/locations/global/workloadIdentityPools/<pool>), and binding the project ID would force a destroy-and-recreate of the pool. Every other resource of the module keeps the project ID. The organization instance supplies this value; the core never presets it."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.project_number))
+    error_message = "project_number must be the numeric Google Cloud project number of the trust zone."
+  }
+}
+
 variable "pool_id" {
   description = "Workload Identity Pool ID of the trust zone. One pool per zone; identities of other zones never share it."
   type        = string

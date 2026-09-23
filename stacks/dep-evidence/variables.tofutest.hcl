@@ -1,8 +1,9 @@
 # The behavioral proofs of the dep-evidence root: the corrected
-# state_bucket_name validation, the workload-job activation gate and the
-# recovery binding — the acceptance paths through assertions and the
-# rejection paths through expect_failures — every run is a plan with refresh
-# disabled, and no run creates infrastructure.
+# state_bucket_name validation, the instance-bound project number binding,
+# the workload-job activation gate and the recovery binding — the acceptance
+# paths through assertions and the rejection paths through expect_failures —
+# every run is a plan with refresh disabled, and no run creates
+# infrastructure.
 #
 # The root carries the gcs backend binding and the dual-fortress encryption
 # block, so its initialization resolves the state bucket and the encryption
@@ -12,8 +13,9 @@
 # file, and every value assigned here is synthetic test data.
 
 variables {
-  project_id = "test-dep-evidence"
-  location   = "europe-west1"
+  project_id     = "test-dep-evidence"
+  project_number = "100000000050"
+  location       = "europe-west1"
 
   workload_network = {
     network_name = "dep-evidence-workload"
@@ -168,4 +170,31 @@ run "rejects_an_invalid_recovery_end_time" {
   }
 
   expect_failures = [var.break_glass_recovery]
+}
+
+run "accepts_a_numeric_project_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.project_number == "100000000050"
+    error_message = "The validation must accept the numeric Google Cloud project number of the zone."
+  }
+}
+
+run "rejects_a_non_numeric_project_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    project_number = "test-dep-evidence"
+  }
+
+  expect_failures = [var.project_number]
 }

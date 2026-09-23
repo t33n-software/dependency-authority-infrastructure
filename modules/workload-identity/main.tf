@@ -22,7 +22,7 @@ locals {
 }
 
 resource "google_iam_workload_identity_pool" "this" {
-  project                   = var.project_id
+  project                   = var.project_number
   workload_identity_pool_id = var.pool_id
   display_name              = var.pool_display_name != "" ? var.pool_display_name : null
   description               = var.pool_description != "" ? var.pool_description : null
