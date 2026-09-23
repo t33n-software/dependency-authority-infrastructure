@@ -136,7 +136,15 @@ infrastructure core.
    form is insufficient for it. The execution identity is never federated
    from CI and keeps the data-plane matrix of item 7. The role contents are
    proven against the provider (`gcloud iam roles describe`), never assumed;
-   the remaining viewer permissions do not apply to a job resource.
+   the remaining viewer permissions do not apply to a job resource. Every
+   trigger identity stays within the platform form for service account IDs
+   (6-30 characters), proven fail-closed by the module validation; where the
+   canonical grammar would exceed the limit, the lane binds the
+   execution-identity-based form — the consumer verification lane binds
+   `dep-consumer-verifier-trigger`, because the strict grammar form
+   `dep-consumer-verification-trigger` carries 33 characters and is proven
+   undeployable against the pinned provider documentation and that
+   validation.
 9. The workload network origin is part of the execution contract: every
    job-owning zone (intake, control, evidence) declares exactly one VPC with
    one subnetwork in the job region carrying Private Google Access through

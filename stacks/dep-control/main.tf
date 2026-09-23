@@ -32,7 +32,7 @@ locals {
     }
     "dep-consumer-verification" = {
       identity_key = "consumer-verification"
-      trigger_id   = "dep-consumer-verification-trigger"
+      trigger_id   = "dep-consumer-verifier-trigger"
     }
   }
 
