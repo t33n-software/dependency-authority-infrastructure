@@ -316,3 +316,44 @@ variable "workload_image_cleanup" {
     error_message = "the staging class carries the keep floor: a most-recent-versions keep policy."
   }
 }
+
+variable "workload_job_env" {
+  description = <<-EOT
+    The instance-bound static environment bindings of the zone's workload
+    jobs, keyed by the canonical job name. The declaration owns every static,
+    non-credential configuration value of a workload completely (the workload
+    configuration ownership convention): the organization instance binds the
+    proven live values as reviewed configuration, and every value referencing
+    another bound surface is a proven projection the instance verifier
+    cross-binds fail-closed against its canonical source. Operation inputs
+    travel as validated execution parameters of the invocation, never as
+    baked-in values, and credentials never travel this surface. The core
+    never presets it.
+  EOT
+  type        = map(map(string))
+
+  validation {
+    condition     = length(setsubtract(keys(var.workload_job_env), keys(local.workload_jobs))) == 0
+    error_message = "workload_job_env must reference only declared workload jobs of the zone topology."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, bindings in var.workload_job_env :
+      alltrue([for key in keys(bindings) : can(regex("^[A-Z][A-Z0-9_]*$", key))])
+    ])
+    error_message = "workload_job_env must carry only well-formed environment variable names (UPPER_SNAKE_CASE)."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, bindings in var.workload_job_env :
+      alltrue([
+        for key, value in bindings :
+        !can(regex("(?i)(password|secret|token|credential|api[_-]?key|private[_-]?key)", key))
+        && !can(regex("(?i)(password|secret|token|credential|api[_-]?key|private[_-]?key)", value))
+      ])
+    ])
+    error_message = "workload_job_env never carries credentials: no key and no value may carry a credential marker."
+  }
+}

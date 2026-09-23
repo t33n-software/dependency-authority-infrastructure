@@ -146,6 +146,13 @@ module "workload_jobs" {
   network               = module.network.workload_network_id
   subnetwork            = module.network.workload_subnetwork_id
 
+  # The declaration owns the static, non-credential configuration of every
+  # workload job completely (the workload configuration ownership
+  # convention): the organization instance binds the proven values as
+  # reviewed configuration, operation inputs travel as validated execution
+  # parameters of the invocation, and credentials never travel this surface.
+  env = lookup(var.workload_job_env, each.key, {})
+
   labels = {
     boundary = "dependency-authority"
     zone     = "control"

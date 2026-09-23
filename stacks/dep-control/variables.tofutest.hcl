@@ -100,6 +100,16 @@ variables {
     zone_projects  = ["projects/100000000002", "projects/100000000003"]
   }
 
+  # The synthetic form of the canonical configuration binding: the static,
+  # non-credential environment bindings of the zone's workload jobs, keyed by
+  # the canonical job name. Every value is synthetic test data.
+  workload_job_env = {
+    "dep-admission" = {
+      DEPENDENCY_AUTHORITY_ZONE      = "control"
+      DEPENDENCY_AUTHORITY_ECOSYSTEM = "go"
+    }
+  }
+
   # The synthetic form of the canonical lifecycle binding: the staging class
   # carries the time-based delete plus the keep floor, the release class
   # carries the keep floor only, and both carry the fail-safe dry-run
@@ -486,4 +496,53 @@ run "rejects_an_identity_without_the_description_surfaces" {
   }
 
   expect_failures = [var.controllers]
+}
+
+run "accepts_the_canonical_workload_job_env_binding" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.workload_job_env["dep-admission"].DEPENDENCY_AUTHORITY_ZONE == "control"
+    error_message = "The workload job env binding must carry the declared job's static configuration."
+  }
+}
+
+run "rejects_an_unknown_job_env_binding" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    workload_job_env = {
+      "dep-ghost" = {
+        DEPENDENCY_AUTHORITY_ZONE = "control"
+      }
+    }
+  }
+
+  expect_failures = [var.workload_job_env]
+}
+
+run "rejects_a_credential_carrying_env_binding" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    workload_job_env = {
+      "dep-admission" = {
+        DEPENDENCY_AUTHORITY_TOKEN = "synthetic"
+      }
+    }
+  }
+
+  expect_failures = [var.workload_job_env]
 }

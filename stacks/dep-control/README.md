@@ -58,9 +58,18 @@ perimeter ingress rule of the class.
   set (`enabled_workload_jobs`) — exactly the bound jobs plus the jobs being
   provisioned in the current window — and a declared-but-planned job never
   enters the plan until its provisioning window activates it. The activation
-  set always carries every bound job (a bound job dropped from the active set
-  would plan its own destruction), and the declaration binds the consistency
-  fail-closed.
+   set always carries every bound job (a bound job dropped from the active set
+   would plan its own destruction), and the declaration binds the consistency
+   fail-closed.
+- The declaration owns the static, non-credential configuration of every
+  workload job completely (the workload configuration ownership convention):
+  the stack consumes the instance-bound `workload_job_env` input — the proven
+  static environment bindings of every job, keyed by the canonical job name —
+  never a stack default. Every value referencing another bound surface is a
+  proven projection the instance verifier cross-binds fail-closed against its
+  canonical source. Operation inputs travel as validated execution parameters
+  of the invocation, never as baked-in values, and credentials never travel
+  this surface.
 - The recovery identity of the control zone: the stack declares the dedicated
   identity through the recovery module — its elevated project role exists
   only under the mandatory time-bound IAM condition, it is never used in
@@ -114,6 +123,10 @@ per-class cleanup policies and the dry-run activation state),
 `enabled_workload_jobs` (the
 instance-bound activation set of the zone's workload jobs: exactly the bound
 jobs plus the jobs being provisioned in the current window),
+`workload_job_env` (the instance-bound static environment bindings of the
+zone's workload jobs, keyed by the canonical job name — the declaration owns
+every static, non-credential configuration value completely; credentials
+never travel this surface),
 `break_glass_recovery` (the approved recovery binding of the control zone:
 the project-level role under the mandatory time-bound IAM condition and the
 RFC 3339 end time), `workload_network` (the instance-bound
