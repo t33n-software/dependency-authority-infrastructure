@@ -2328,6 +2328,144 @@ func TestControlStackBindsTheWorkloadJobEnvOwnership(t *testing.T) {
 	}
 }
 
+func TestEveryStackBindsTheInstanceBoundProjectNumber(t *testing.T) {
+	// The instance-bound project number form (DAI-30): the workload identity
+	// pool's project attribute is ForceNew in the pinned provider, and the
+	// provider state carries the pool's project as the numeric project number
+	// (the import and read-back form projects/<number>/...). Binding the
+	// project ID would force a destroy-and-recreate of the pool at the
+	// convergence window. The module gains the required, numerically validated
+	// project_number input; only the pool binds it; every other resource keeps
+	// the project ID. The form is uniform across all five zone stacks.
+	moduleVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "workload-identity", "variables.tf")))
+	start := strings.Index(moduleVariables, `variable "project_number" {`)
+	if start < 0 {
+		t.Fatal("modules/workload-identity/variables.tf does not carry the project_number input")
+	}
+	segment := moduleVariables[start:]
+	if next := strings.Index(segment, ` variable "`); next > 0 {
+		segment = segment[:next]
+	}
+	if strings.Contains(segment, "default") {
+		t.Fatal("modules/workload-identity/variables.tf carries a default for project_number; the value is an instance binding, never a default")
+	}
+	if !strings.Contains(segment, `can(regex("^[0-9]+$", var.project_number))`) {
+		t.Fatal("modules/workload-identity/variables.tf does not bind the numeric validation of project_number")
+	}
+
+	moduleMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "workload-identity", "main.tf")))
+	poolStart := strings.Index(moduleMain, `resource "google_iam_workload_identity_pool" "this"`)
+	if poolStart < 0 {
+		t.Fatal("modules/workload-identity/main.tf does not create the zone pool")
+	}
+	poolSegment := moduleMain[poolStart:]
+	if next := strings.Index(poolSegment, ` resource "`); next > 0 {
+		poolSegment = poolSegment[:next]
+	}
+	if !strings.Contains(poolSegment, `project = var.project_number`) {
+		t.Fatal("modules/workload-identity/main.tf does not bind the pool project to the instance-bound project number")
+	}
+	if count := strings.Count(moduleMain, `project = var.project_number`); count != 1 {
+		t.Fatalf("modules/workload-identity/main.tf binds the project number %d times, want exactly once (only the pool)", count)
+	}
+	if count := strings.Count(moduleMain, `project = var.project_id`); count != 4 {
+		t.Fatalf("modules/workload-identity/main.tf keeps the project ID on %d resources, want exactly 4 (the providers, both service account families and the identity roles)", count)
+	}
+
+	for _, stack := range stackNames {
+		variables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf")))
+		stackStart := strings.Index(variables, `variable "project_number" {`)
+		if stackStart < 0 {
+			t.Fatalf("stacks/%s/variables.tf does not carry the project_number input", stack)
+		}
+		stackSegment := variables[stackStart:]
+		if next := strings.Index(stackSegment, ` variable "`); next > 0 {
+			stackSegment = stackSegment[:next]
+		}
+		if strings.Contains(stackSegment, "default") {
+			t.Fatalf("stacks/%s/variables.tf carries a default for project_number; the value is an instance binding, never a default", stack)
+		}
+		if !strings.Contains(stackSegment, `can(regex("^[0-9]+$", var.project_number))`) {
+			t.Fatalf("stacks/%s/variables.tf does not bind the numeric validation of project_number", stack)
+		}
+
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		moduleStart := strings.Index(main, `module "workload_identity" {`)
+		if moduleStart < 0 {
+			t.Fatalf("stacks/%s/main.tf does not call the workload-identity module", stack)
+		}
+		moduleSegment := main[moduleStart:]
+		if next := strings.Index(moduleSegment, ` module "`); next > 0 {
+			moduleSegment = moduleSegment[:next]
+		}
+		if !strings.Contains(moduleSegment, `project_number = var.project_number`) {
+			t.Fatalf("stacks/%s/main.tf does not wire the instance-bound project number into the workload identity module", stack)
+		}
+
+		// The behavioral proofs live beside the stack: the synthetic binding
+		// and the rejection run of a non-numeric value.
+		fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tofutest.hcl")))
+		if !strings.Contains(fixture, `project_number = "`) {
+			t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the synthetic project number binding", stack)
+		}
+		if !strings.Contains(fixture, `run "rejects_a_non_numeric_project_number"`) {
+			t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the rejection run of a non-numeric project number", stack)
+		}
+		if !strings.Contains(fixture, "expect_failures = [var.project_number]") {
+			t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the rejection proof of the project number binding", stack)
+		}
+
+		readme := readRepositoryFile(t, filepath.Join("stacks", stack, "README.md"))
+		if !strings.Contains(readme, "project_number") {
+			t.Fatalf("the %s stack README does not document the project_number input", stack)
+		}
+	}
+
+	// The module documentation carries the binding form and its rationale.
+	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "workload-identity", "README.md"))
+	for _, required := range []string{"project_number", "destroy", "project ID"} {
+		if !strings.Contains(moduleReadme, required) {
+			t.Fatalf("the workload-identity module README does not document %q of the project number binding", required)
+		}
+	}
+
+	// The architecture decision record carries the instance-bound
+	// project-number decision including the rejected data-source form.
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"project number",
+		"project_number",
+		"destroy",
+		`data "google_project"`,
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the project number decision element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-30") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-30")
+	}
+}
+
+func TestRepositoryFilesSkipTheLocalWorkingForms(t *testing.T) {
+	// The bound local working forms are never repository content: the
+	// convergence-window import carrier (the git-ignored window.imports.tf)
+	// and the engine override forms are local working surfaces, removed after
+	// their proof — a paused convergence window never fails the guards.
+	for _, name := range []string{"window.imports.tf", "override.tf", "override.tf.json", "example_override.tf", "example_override.tf.json"} {
+		if !isLocalWorkingFile(name) {
+			t.Fatalf("isLocalWorkingFile(%q) = false, want true (the bound local working form)", name)
+		}
+	}
+	for _, name := range []string{"main.tf", "variables.tf", "outputs.tf", "versions.tf", "window.tf", "window.imports.tf.json"} {
+		if isLocalWorkingFile(name) {
+			t.Fatalf("isLocalWorkingFile(%q) = true, want false (bound repository content)", name)
+		}
+	}
+}
+
 func modulePaths() []string {
 	paths := make([]string, 0, len(moduleNames))
 	for _, module := range moduleNames {
@@ -2348,6 +2486,19 @@ func normalizeWhitespace(content string) string {
 	return strings.Join(strings.Fields(content), " ")
 }
 
+// isLocalWorkingFile reports the bound local working forms that are never
+// repository content: the git-ignored convergence-window import carrier
+// (window.imports.tf) and the engine's override forms (override.tf,
+// *_override.tf and their JSON variants). The guards evaluate the bound
+// repository content only.
+func isLocalWorkingFile(name string) bool {
+	switch name {
+	case "window.imports.tf", "override.tf", "override.tf.json":
+		return true
+	}
+	return strings.HasSuffix(name, "_override.tf") || strings.HasSuffix(name, "_override.tf.json")
+}
+
 func repositoryFiles(t *testing.T, extensions []string) []string {
 	t.Helper()
 	root := repositoryPath()
@@ -2363,6 +2514,12 @@ func repositoryFiles(t *testing.T, extensions []string) []string {
 			default:
 				return nil
 			}
+		}
+		// Local working files are never repository content: the git-ignored
+		// convergence-window import carrier and the engine's override forms
+		// carry local working values and are removed after their proof.
+		if isLocalWorkingFile(entry.Name()) {
+			return nil
 		}
 		for _, extension := range extensions {
 			if filepath.Ext(path) == extension {

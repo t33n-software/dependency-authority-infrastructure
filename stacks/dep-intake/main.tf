@@ -87,9 +87,10 @@ module "repositories" {
 }
 
 module "workload_identity" {
-  source     = "../../modules/workload-identity"
-  project_id = var.project_id
-  pool_id    = var.pool_id
+  source         = "../../modules/workload-identity"
+  project_id     = var.project_id
+  project_number = var.project_number
+  pool_id        = var.pool_id
 
   identities = {
     fetcher = merge(var.fetcher, {

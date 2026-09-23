@@ -3,6 +3,16 @@ variable "project_id" {
   type        = string
 }
 
+variable "project_number" {
+  description = "Google Cloud project number of the approved trust zone: the workload identity pool binds it because the provider state carries the pool's project as the numeric project number, and binding the project ID would force a destroy-and-recreate of the pool; every other surface keeps the project ID. Supplied by the organization instance; the core never presets it."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.project_number))
+    error_message = "project_number must be the numeric Google Cloud project number of the zone."
+  }
+}
+
 variable "location" {
   description = "Artifact Registry location of the approved repositories."
   type        = string

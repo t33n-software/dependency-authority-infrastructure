@@ -112,9 +112,10 @@ module "workload_image_registries" {
 }
 
 module "workload_identity" {
-  source     = "../../modules/workload-identity"
-  project_id = var.project_id
-  pool_id    = var.pool_id
+  source         = "../../modules/workload-identity"
+  project_id     = var.project_id
+  project_number = var.project_number
+  pool_id        = var.pool_id
 
   # The canonical human-readable surfaces of the zone pool (the mandatory
   # description duty): the display name binds the pool's identity class name,

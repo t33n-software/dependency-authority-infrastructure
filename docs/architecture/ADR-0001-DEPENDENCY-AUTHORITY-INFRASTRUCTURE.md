@@ -351,6 +351,29 @@ infrastructure core.
      unknown job and a credential-carrying binding in the governed execution
      window.
 
+ 18. The workload identity pool of every zone binds the instance-bound
+     project number, never the project ID: the pool's `project` attribute is
+     ForceNew in the pinned provider, and the provider state carries the
+     pool's project as the numeric project number (the import and read-back
+     form `projects/<number>/locations/global/workloadIdentityPools/<pool>`),
+     so binding the project ID would force a destroy-and-recreate of the pool
+     at the convergence window — a blocking defect, because recreating the
+     pool destroys its providers and breaks every federation binding of the
+     zone. The workload-identity module gains the required, numerically
+     validated `project_number` input (the organization instance supplies the
+     value; the core never presets it); only the pool binds it, and every
+     other resource of the module (the providers, both service account
+     families and the identity role bindings) keeps the project ID, because
+     their state carries the ID form. Every zone stack binds the value through
+     the required `project_number` input and wires it into the module call —
+     uniform across all five zones. The rejected alternative, a
+     `data "google_project"` lookup resolving the number at plan time, would
+     introduce a runtime read dependency into every plan and break the offline
+     behavioral proofs of the pack gates; the instance binding keeps the value
+     reviewed, static and offline-provable. The behavioral proofs live beside
+     the code: every stack fixture carries the synthetic binding and the
+     rejection run of a non-numeric value.
+
 ## Consequences
 
 - Every module, policy binding and stack change is a governed, reviewable
