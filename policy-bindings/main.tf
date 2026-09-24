@@ -10,8 +10,8 @@ locals {
 resource "google_org_policy_policy" "this" {
   for_each = { for constraint, enforced in local.boolean_constraints : constraint => enforced if enforced }
 
-  name   = "projects/${var.project_id}/policies/${each.key}"
-  parent = "projects/${var.project_id}"
+  name   = "projects/${var.project_number}/policies/${each.key}"
+  parent = "projects/${var.project_number}"
 
   spec {
     rules {
@@ -28,8 +28,8 @@ resource "google_org_policy_policy" "this" {
 resource "google_org_policy_policy" "cloud_run_vpc_egress" {
   count = var.cloud_run_vpc_egress_all_traffic_only ? 1 : 0
 
-  name   = "projects/${var.project_id}/policies/run.allowedVPCEgress"
-  parent = "projects/${var.project_id}"
+  name   = "projects/${var.project_number}/policies/run.allowedVPCEgress"
+  parent = "projects/${var.project_number}"
 
   spec {
     rules {
@@ -43,8 +43,8 @@ resource "google_org_policy_policy" "cloud_run_vpc_egress" {
 resource "google_org_policy_policy" "cloud_run_ingress" {
   count = var.cloud_run_ingress_internal_only ? 1 : 0
 
-  name   = "projects/${var.project_id}/policies/run.allowedIngress"
-  parent = "projects/${var.project_id}"
+  name   = "projects/${var.project_number}/policies/run.allowedIngress"
+  parent = "projects/${var.project_number}"
 
   spec {
     rules {

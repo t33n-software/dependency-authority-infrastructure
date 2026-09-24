@@ -10,12 +10,15 @@ the execution identity.
 
 - One pool per trust zone; pools, providers and service accounts are never
   shared across intake, quarantine, approved, evidence or control.
-- The pool binds the instance-bound numeric project number (`project_number`),
-  never the project ID: the pool's `project` attribute is ForceNew and the
-  provider state carries the pool's project as the number (the import and
-  read-back form `projects/<number>/locations/global/workloadIdentityPools/<pool>`),
-  so binding the project ID would force a destroy-and-recreate of the pool.
-  Every other resource of the module keeps the project ID.
+- The pool and its providers bind the instance-bound numeric project number
+  (`project_number`), never the project ID: their `project` attribute is
+  ForceNew and the provider state carries them under the number (the import
+  and read-back forms
+  `projects/<number>/locations/global/workloadIdentityPools/<pool>` and
+  `projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`),
+  so binding the project ID would force a destroy-and-recreate of the pool
+  and the providers. The service accounts and the identity role bindings keep
+  the project ID.
 - The default attribute mapping covers the GitHub OIDC claims (subject,
   actor, audience, repository, workflow reference, environment, ref); a custom
   mapping must keep `google.subject`.

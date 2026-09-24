@@ -4,7 +4,7 @@ variable "project_id" {
 }
 
 variable "project_number" {
-  description = "Google Cloud project number of the trust zone owning the pool: the pool binds it because the provider state carries the pool's project as the numeric project number (the import and read-back form projects/<number>/locations/global/workloadIdentityPools/<pool>), and binding the project ID would force a destroy-and-recreate of the pool. Every other resource of the module keeps the project ID. The organization instance supplies this value; the core never presets it."
+  description = "Google Cloud project number of the trust zone owning the pool: the pool and its providers bind it because the provider state carries them under the numeric project number (the import and read-back forms projects/<number>/locations/global/workloadIdentityPools/<pool> and projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>), and binding the project ID would force a destroy-and-recreate of the pool and the providers. The service accounts and the identity role bindings keep the project ID. The organization instance supplies this value; the core never presets it."
   type        = string
 
   validation {
