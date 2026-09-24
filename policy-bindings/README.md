@@ -17,8 +17,13 @@ organization migration lands.
   `run.allowedIngress` restricted to `internal`, both disabled by default and
   enabled only by the job-owning zones); additional constraints enter through
   a governed change.
+- Every organization policy is a number-addressed resource (its name and
+  parent carry the `projects/<number>` form), so the module binds the
+  instance-supplied numeric project number (`project_number`) and never the
+  project ID — binding the project ID would force a destroy-and-recreate of
+  the live policies at the convergence window.
 - Never carries organization, tenant, identity, network, secret or registry
-  bindings beyond the instance-supplied project ID.
+  bindings beyond the instance-supplied project number.
 
 ## Usage
 
@@ -26,7 +31,7 @@ organization migration lands.
 module "policy_bindings" {
   source = "git::https://github.com/<organization>/dependency-authority-infrastructure//policy-bindings?ref=<exact-version>"
 
-  project_id = "<organization>-dep-intake"
+  project_number = "<numeric-project-number-of-the-zone>"
 
   # The job-owning zones enable the Cloud Run enforcement surface.
   cloud_run_vpc_egress_all_traffic_only = true

@@ -359,28 +359,40 @@ infrastructure core.
      unknown job and a credential-carrying binding in the governed execution
      window.
 
- 18. The workload identity pool of every zone binds the instance-bound
-     project number, never the project ID: the pool's `project` attribute is
-     ForceNew in the pinned provider, and the provider state carries the
-     pool's project as the numeric project number (the import and read-back
-     form `projects/<number>/locations/global/workloadIdentityPools/<pool>`),
-     so binding the project ID would force a destroy-and-recreate of the pool
-     at the convergence window — a blocking defect, because recreating the
-     pool destroys its providers and breaks every federation binding of the
-     zone. The workload-identity module gains the required, numerically
-     validated `project_number` input (the organization instance supplies the
-     value; the core never presets it); only the pool binds it, and every
-     other resource of the module (the providers, both service account
-     families and the identity role bindings) keeps the project ID, because
-     their state carries the ID form. Every zone stack binds the value through
-     the required `project_number` input and wires it into the module call —
-     uniform across all five zones. The rejected alternative, a
-     `data "google_project"` lookup resolving the number at plan time, would
-     introduce a runtime read dependency into every plan and break the offline
-     behavioral proofs of the pack gates; the instance binding keeps the value
-     reviewed, static and offline-provable. The behavioral proofs live beside
-     the code: every stack fixture carries the synthetic binding and the
-     rejection run of a non-numeric value.
+ 18. Every number-addressed resource class of the declaration plane binds the
+     instance-bound project number, never the project ID: the workload
+     identity pool and its providers (their `project` attribute is ForceNew
+     in the pinned provider, and the provider state carries them under the
+     numeric project number — the import and read-back forms
+     `projects/<number>/locations/global/workloadIdentityPools/<pool>` and
+     `projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`)
+     and the organization policies of the policy-bindings module (their name
+     and parent forms `projects/<number>/policies/<constraint>`). Binding the
+     project ID on a number-addressed class forces a destroy-and-recreate of
+     the live resource at the convergence window — a blocking defect, because
+     recreating the pool destroys its providers and breaks every federation
+     binding of the zone. The full-surface audit of every project-referencing
+     resource class of the five stacks closed the assignment matrix against
+     the pinned provider documentation: the artifact repositories and their
+     IAM bindings, the vpcsc upstream allowance, the Cloud Run jobs and their
+     invoker bindings, the evidence archive bucket, the logging sinks, the
+     network surfaces, the service accounts and the project IAM bindings are
+     ID-addressed and keep the project ID. The workload-identity module and
+     the policy-bindings module carry the required, numerically validated
+     `project_number` input (the organization instance supplies the value;
+     the core never presets it), and the policy-bindings module binds only
+     the number — it carries no project ID input. Every zone stack binds the
+     value through the required `project_number` input and wires it into both
+     module calls — uniform across all five zones. The rejected alternative,
+     a `data "google_project"` lookup resolving the number at plan time,
+     would introduce a runtime read dependency into every plan and break the
+     offline behavioral proofs of the pack gates; the instance binding keeps
+     the value reviewed, static and offline-provable. The behavioral proofs
+     live beside the code: every stack fixture carries the synthetic binding
+     and the rejection run of a non-numeric value, and the policy-bindings
+     module fixture proves the module validation offline. The packaging
+     contract guard pins the assignment matrix fail-closed, per resource
+     class and across every module.
 
 ## Consequences
 

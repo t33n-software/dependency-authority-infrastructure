@@ -63,8 +63,8 @@ provider "google-beta" {
 }
 
 module "policy_bindings" {
-  source     = "../../policy-bindings"
-  project_id = var.project_id
+  source         = "../../policy-bindings"
+  project_number = var.project_number
 
   disable_service_account_key_creation  = var.policy_constraints.disable_service_account_key_creation
   disable_service_account_key_upload    = var.policy_constraints.disable_service_account_key_upload

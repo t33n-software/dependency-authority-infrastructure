@@ -4,7 +4,7 @@ variable "project_id" {
 }
 
 variable "project_number" {
-  description = "Google Cloud project number of the evidence trust zone: the workload identity pool binds it because the provider state carries the pool's project as the numeric project number, and binding the project ID would force a destroy-and-recreate of the pool; every other surface keeps the project ID. Supplied by the organization instance; the core never presets it."
+  description = "Google Cloud project number of the evidence trust zone: the number-addressed classes bind it — the workload identity pool and its providers (the provider state carries them under the numeric project number; the ID form would force their destroy-and-recreate) and the organization policies (their name and parent are number-addressed); every other surface keeps the project ID. Supplied by the organization instance; the core never presets it."
   type        = string
 
   validation {

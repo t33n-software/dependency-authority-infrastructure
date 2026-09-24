@@ -1449,8 +1449,8 @@ func TestStacksDeclareTheWorkloadNetworkOrigin(t *testing.T) {
 	for _, required := range []string{
 		`resource "google_org_policy_policy" "cloud_run_vpc_egress"`,
 		`resource "google_org_policy_policy" "cloud_run_ingress"`,
-		`"projects/${var.project_id}/policies/run.allowedVPCEgress"`,
-		`"projects/${var.project_id}/policies/run.allowedIngress"`,
+		`"projects/${var.project_number}/policies/run.allowedVPCEgress"`,
+		`"projects/${var.project_number}/policies/run.allowedIngress"`,
 		`allowed_values = ["all-traffic"]`,
 		`allowed_values = ["internal"]`,
 	} {
@@ -2329,14 +2329,15 @@ func TestControlStackBindsTheWorkloadJobEnvOwnership(t *testing.T) {
 }
 
 func TestEveryStackBindsTheInstanceBoundProjectNumber(t *testing.T) {
-	// The instance-bound project number form (DAI-30): the workload identity
-	// pool's project attribute is ForceNew in the pinned provider, and the
-	// provider state carries the pool's project as the numeric project number
-	// (the import and read-back form projects/<number>/...). Binding the
-	// project ID would force a destroy-and-recreate of the pool at the
-	// convergence window. The module gains the required, numerically validated
-	// project_number input; only the pool binds it; every other resource keeps
-	// the project ID. The form is uniform across all five zone stacks.
+	// The project reference form discipline (DAI-30, completed by DAI-33):
+	// every project-referencing resource binds the form the platform state
+	// carries for its class — the number-addressed classes (the workload
+	// identity pool, its providers and every organization policy) bind the
+	// instance-bound numeric project number, and the ID-addressed classes keep
+	// the project ID. Binding the project ID on a number-addressed class
+	// forces a destroy-and-recreate of the live resource at the convergence
+	// window. This guard pins the complete assignment matrix fail-closed, per
+	// resource class and across every module.
 	moduleVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "workload-identity", "variables.tf")))
 	start := strings.Index(moduleVariables, `variable "project_number" {`)
 	if start < 0 {
@@ -2353,23 +2354,79 @@ func TestEveryStackBindsTheInstanceBoundProjectNumber(t *testing.T) {
 		t.Fatal("modules/workload-identity/variables.tf does not bind the numeric validation of project_number")
 	}
 
+	// The workload-identity module matrix: the pool and the providers bind the
+	// number; both service account families and the identity role bindings
+	// keep the project ID.
 	moduleMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "workload-identity", "main.tf")))
-	poolStart := strings.Index(moduleMain, `resource "google_iam_workload_identity_pool" "this"`)
-	if poolStart < 0 {
-		t.Fatal("modules/workload-identity/main.tf does not create the zone pool")
+	for _, class := range []struct {
+		marker  string
+		binding string
+	}{
+		{`resource "google_iam_workload_identity_pool" "this"`, `project = var.project_number`},
+		{`resource "google_iam_workload_identity_pool_provider" "this"`, `project = var.project_number`},
+		{`resource "google_service_account" "this"`, `project = var.project_id`},
+		{`resource "google_service_account" "trigger"`, `project = var.project_id`},
+		{`resource "google_project_iam_member" "identity_roles"`, `project = var.project_id`},
+	} {
+		segment := segmentFromMarker(t, moduleMain, class.marker, ` resource "`, "modules/workload-identity/main.tf")
+		if !strings.Contains(segment, class.binding) {
+			t.Fatalf("modules/workload-identity/main.tf does not bind %q on %q", class.binding, class.marker)
+		}
 	}
-	poolSegment := moduleMain[poolStart:]
-	if next := strings.Index(poolSegment, ` resource "`); next > 0 {
-		poolSegment = poolSegment[:next]
+	if count := strings.Count(moduleMain, `project = var.project_number`); count != 2 {
+		t.Fatalf("modules/workload-identity/main.tf binds the project number %d times, want exactly 2 (the pool and the providers)", count)
 	}
-	if !strings.Contains(poolSegment, `project = var.project_number`) {
-		t.Fatal("modules/workload-identity/main.tf does not bind the pool project to the instance-bound project number")
+	if count := strings.Count(moduleMain, `project = var.project_id`); count != 3 {
+		t.Fatalf("modules/workload-identity/main.tf keeps the project ID on %d resources, want exactly 3 (both service account families and the identity roles)", count)
 	}
-	if count := strings.Count(moduleMain, `project = var.project_number`); count != 1 {
-		t.Fatalf("modules/workload-identity/main.tf binds the project number %d times, want exactly once (only the pool)", count)
+
+	// The policy-bindings module: every organization policy is
+	// number-addressed, and the module never references the project ID.
+	policyVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("policy-bindings", "variables.tf")))
+	if strings.Contains(policyVariables, `variable "project_id"`) {
+		t.Fatal("policy-bindings/variables.tf still carries the project ID input; every organization policy is number-addressed")
 	}
-	if count := strings.Count(moduleMain, `project = var.project_id`); count != 4 {
-		t.Fatalf("modules/workload-identity/main.tf keeps the project ID on %d resources, want exactly 4 (the providers, both service account families and the identity roles)", count)
+	policyNumberInput := segmentFromMarker(t, policyVariables, `variable "project_number" {`, ` variable "`, "policy-bindings/variables.tf")
+	if strings.Contains(policyNumberInput, "default") {
+		t.Fatal("policy-bindings/variables.tf carries a default for project_number; the value is an instance binding, never a default")
+	}
+	if !strings.Contains(policyNumberInput, `can(regex("^[0-9]+$", var.project_number))`) {
+		t.Fatal("policy-bindings/variables.tf does not bind the numeric validation of project_number")
+	}
+
+	policyMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("policy-bindings", "main.tf")))
+	if strings.Contains(policyMain, "var.project_id") {
+		t.Fatal("policy-bindings/main.tf still references the project ID; every organization policy binds the instance-bound project number")
+	}
+	if count := strings.Count(policyMain, "projects/${var.project_number}"); count != 6 {
+		t.Fatalf("policy-bindings/main.tf binds the project number on %d surfaces, want exactly 6 (the name and parent of every organization policy resource)", count)
+	}
+	for _, marker := range []string{
+		`resource "google_org_policy_policy" "this"`,
+		`resource "google_org_policy_policy" "cloud_run_vpc_egress"`,
+		`resource "google_org_policy_policy" "cloud_run_ingress"`,
+	} {
+		segment := segmentFromMarker(t, policyMain, marker, ` resource "`, "policy-bindings/main.tf")
+		if !strings.Contains(segment, `name = "projects/${var.project_number}/policies/`) {
+			t.Fatalf("policy-bindings/main.tf does not bind the number form in the name of %q", marker)
+		}
+		if !strings.Contains(segment, `parent = "projects/${var.project_number}"`) {
+			t.Fatalf("policy-bindings/main.tf does not bind the number form in the parent of %q", marker)
+		}
+	}
+
+	// The negative proof across every other module: the number-addressed
+	// classes live exactly in the workload-identity and policy-bindings
+	// modules; no other module ever references the project number.
+	for _, module := range moduleNames {
+		if module == "workload-identity" {
+			continue
+		}
+		for _, file := range []string{"main.tf", "variables.tf"} {
+			if content := readRepositoryFile(t, filepath.Join("modules", module, file)); strings.Contains(content, "project_number") {
+				t.Fatalf("modules/%s/%s references the project number; the number-addressed classes live exactly in the workload-identity and policy-bindings modules", module, file)
+			}
+		}
 	}
 
 	for _, stack := range stackNames {
@@ -2401,6 +2458,16 @@ func TestEveryStackBindsTheInstanceBoundProjectNumber(t *testing.T) {
 		if !strings.Contains(moduleSegment, `project_number = var.project_number`) {
 			t.Fatalf("stacks/%s/main.tf does not wire the instance-bound project number into the workload identity module", stack)
 		}
+		policySegment := segmentFromMarker(t, main, `module "policy_bindings" {`, ` module "`, "stacks/"+stack+"/main.tf")
+		if !strings.Contains(policySegment, `project_number = var.project_number`) {
+			t.Fatalf("stacks/%s/main.tf does not wire the instance-bound project number into the policy bindings module", stack)
+		}
+		if strings.Contains(policySegment, "project_id") {
+			t.Fatalf("stacks/%s/main.tf still wires the project ID into the policy bindings module; every organization policy is number-addressed", stack)
+		}
+		if count := strings.Count(main, "project_number = var.project_number"); count != 2 {
+			t.Fatalf("stacks/%s/main.tf wires the project number %d times, want exactly 2 (the workload identity and the policy bindings module calls)", stack, count)
+		}
 
 		// The behavioral proofs live beside the stack: the synthetic binding
 		// and the rejection run of a non-numeric value.
@@ -2421,6 +2488,20 @@ func TestEveryStackBindsTheInstanceBoundProjectNumber(t *testing.T) {
 		}
 	}
 
+	// The module-level behavioral proof of the policy-bindings validation lives
+	// beside the module and executes offline (the module carries no backend and
+	// no encryption block).
+	policyFixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("policy-bindings", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`run "accepts_a_numeric_project_number"`,
+		`run "rejects_a_non_numeric_project_number"`,
+		"expect_failures = [var.project_number]",
+	} {
+		if !strings.Contains(policyFixture, required) {
+			t.Fatalf("policy-bindings/variables.tofutest.hcl does not carry the project number proof element %q", required)
+		}
+	}
+
 	// The module documentation carries the binding form and its rationale.
 	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "workload-identity", "README.md"))
 	for _, required := range []string{"project_number", "destroy", "project ID"} {
@@ -2428,15 +2509,23 @@ func TestEveryStackBindsTheInstanceBoundProjectNumber(t *testing.T) {
 			t.Fatalf("the workload-identity module README does not document %q of the project number binding", required)
 		}
 	}
+	policyReadme := readRepositoryFile(t, filepath.Join("policy-bindings", "README.md"))
+	if !strings.Contains(policyReadme, "project_number") {
+		t.Fatal("the policy-bindings module README does not document the project number binding")
+	}
+	if strings.Contains(policyReadme, "project_id") {
+		t.Fatal("the policy-bindings module README still references the project ID input; every organization policy is number-addressed")
+	}
 
-	// The architecture decision record carries the instance-bound
-	// project-number decision including the rejected data-source form.
+	// The architecture decision record carries the completed project number
+	// decision including the rejected data-source form.
 	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
 	for _, required := range []string{
 		"project number",
 		"project_number",
 		"destroy",
 		`data "google_project"`,
+		"organization policies",
 	} {
 		if !strings.Contains(adr, required) {
 			t.Fatalf("ADR-0001 does not carry the project number decision element %q", required)
@@ -2446,6 +2535,9 @@ func TestEveryStackBindsTheInstanceBoundProjectNumber(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-30") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-30")
+	}
+	if !strings.Contains(traceability, "DAI-33") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-33")
 	}
 }
 
@@ -2484,6 +2576,23 @@ func stackPaths() []string {
 
 func normalizeWhitespace(content string) string {
 	return strings.Join(strings.Fields(content), " ")
+}
+
+// segmentFromMarker returns the normalized content from the block marker up
+// to the next top-level block marker of the same kind (or the end of the
+// content), so a guard asserts on exactly one resource, module or variable
+// block; a missing marker fails the test with the named surface.
+func segmentFromMarker(t *testing.T, content string, marker string, nextMarker string, surface string) string {
+	t.Helper()
+	start := strings.Index(content, marker)
+	if start < 0 {
+		t.Fatalf("%s does not carry %q", surface, marker)
+	}
+	segment := content[start:]
+	if next := strings.Index(segment, nextMarker); next > 0 {
+		segment = segment[:next]
+	}
+	return segment
 }
 
 // isLocalWorkingFile reports the bound local working forms that are never

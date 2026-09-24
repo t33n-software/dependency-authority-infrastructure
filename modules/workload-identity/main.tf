@@ -31,7 +31,7 @@ resource "google_iam_workload_identity_pool" "this" {
 resource "google_iam_workload_identity_pool_provider" "this" {
   for_each = var.identities
 
-  project                            = var.project_id
+  project                            = var.project_number
   workload_identity_pool_id          = google_iam_workload_identity_pool.this.workload_identity_pool_id
   workload_identity_pool_provider_id = each.value.provider_id
   display_name                       = each.value.display_name != "" ? each.value.display_name : null

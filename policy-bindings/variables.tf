@@ -1,6 +1,11 @@
-variable "project_id" {
-  description = "Google Cloud project ID of the trust zone receiving the policy constraints. The organization instance supplies this value; the core never carries a default."
+variable "project_number" {
+  description = "Google Cloud project number of the trust zone receiving the policy constraints: every organization policy is a number-addressed resource (its name and parent carry the projects/<number> form), so the module binds the numeric project number and never the project ID — binding the project ID would force a destroy-and-recreate of the live policies at the convergence window. The organization instance supplies this value; the core never presets it."
   type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.project_number))
+    error_message = "project_number must be the numeric Google Cloud project number of the trust zone."
+  }
 }
 
 variable "disable_service_account_key_creation" {
