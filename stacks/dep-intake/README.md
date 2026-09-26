@@ -64,10 +64,12 @@ remote repositories' configured upstreams; never a perimeter egress rule).
   no resource for the surface; no other zone declares the allowance (zone
   purity).
 - The recovery identity of the intake zone: the stack declares the dedicated
-  identity through the recovery module — its elevated project role exists
-  only under the mandatory time-bound IAM condition, it is never used in
-  normal operation and never federated from CI, and it holds no data-plane
-  grant. The role and the end time are approved instance decisions, supplied
+  identity through the recovery module — its elevated capability exists only
+  as the declared, dormant privileged-access entitlement (never a standing
+  grant), it is never used in normal operation and never federated from CI,
+  and it holds no data-plane grant. Every activation is approval- and
+  justification-bound and time-boxed by the platform-enforced grant duration;
+  the duration and the approver set are approved instance decisions, supplied
   through the `break_glass_recovery` input.
 - The stack consumes the zone state home — the dedicated state bucket of the
   zone holding that zone's root states and nothing else — through the final
@@ -86,8 +88,8 @@ remote repositories' configured upstreams; never a perimeter egress rule).
 `enabled_workload_jobs` (the instance-bound activation set of the zone's
 workload jobs: exactly the bound jobs plus the jobs being provisioned in the
 current window), `break_glass_recovery` (the approved recovery binding of the
-intake zone: the project-level role under the mandatory time-bound IAM
-condition and the RFC 3339 end time), `workload_network` (the instance-bound zone VPC names and
+intake zone: the per-activation grant duration of the recovery entitlement
+and the approver principal set of its approval workflow), `workload_network` (the instance-bound zone VPC names and
 CIDR),
 `forensics_group` (the instance-bound forensics reader group),
 `evidence_bucket_name`, `state_bucket_name` (the instance-bound zone state
@@ -102,4 +104,5 @@ Repository IDs and URIs per ecosystem, the fetcher service account email and
 its invoke-only trigger identity email, the pool resource name, the audit
 sink writer identity, the enforced policy constraints, the workload job
 resource IDs keyed by canonical job name, the workload network and
-subnetwork resource IDs and the recovery identity email.
+subnetwork resource IDs, the recovery identity email and the recovery
+entitlement resource name.

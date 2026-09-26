@@ -41,8 +41,8 @@ variables {
   enabled_workload_jobs = ["dep-intake-fetch"]
 
   break_glass_recovery = {
-    role               = "roles/resourcemanager.projectIamAdmin"
-    condition_end_time = "2027-01-01T00:00:00Z"
+    max_request_duration = "7200s"
+    approvers            = ["group:dep-break-glass-approvers@example.com"]
   }
 }
 
@@ -146,7 +146,7 @@ run "rejects_an_unknown_enabled_job" {
   expect_failures = [var.enabled_workload_jobs]
 }
 
-run "rejects_an_invalid_recovery_end_time" {
+run "rejects_an_invalid_recovery_duration" {
   command = plan
 
   plan_options {
@@ -155,8 +155,25 @@ run "rejects_an_invalid_recovery_end_time" {
 
   variables {
     break_glass_recovery = {
-      role               = "roles/resourcemanager.projectIamAdmin"
-      condition_end_time = "not-a-timestamp"
+      max_request_duration = "not-a-duration"
+      approvers            = ["group:dep-break-glass-approvers@example.com"]
+    }
+  }
+
+  expect_failures = [var.break_glass_recovery]
+}
+
+run "rejects_an_empty_recovery_approver_set" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    break_glass_recovery = {
+      max_request_duration = "7200s"
+      approvers            = []
     }
   }
 

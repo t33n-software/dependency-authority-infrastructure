@@ -181,27 +181,30 @@ variable "enabled_workload_jobs" {
 
 variable "break_glass_recovery" {
   description = <<-EOT
-    The approved recovery binding of the intake zone: the project-level role
-    the recovery identity receives under the mandatory time-bound IAM
-    condition and the RFC 3339 UTC end time after which the grant stops
-    applying. Both are approved instance decisions; the core never presets
-    them.
+    The approved recovery binding of the intake zone: the per-activation
+    grant duration of the recovery entitlement (the platform-enforced
+    time-box in the platform's seconds form) and the approver principal set
+    of its approval workflow — every activation is approval- and
+    justification-bound. Both are approved instance decisions; the core never
+    presets them. The curated predefined-role set of the entitlement is
+    derived from the zone's declared module inventory and proven complete by
+    the infrastructure core's contract guard — never instance-bound.
   EOT
   type = object({
-    role               = string
-    condition_end_time = string
+    max_request_duration = string
+    approvers            = set(string)
   })
 
   validation {
-    condition = (
-      can(regex("^roles/[A-Za-z][A-Za-z0-9._]+$", var.break_glass_recovery.role))
-      || can(regex("^projects/[a-z][a-z0-9-]*/roles/[A-Za-z][A-Za-z0-9_]*$", var.break_glass_recovery.role))
-    )
-    error_message = "break_glass_recovery.role must be a predefined Google Cloud role (roles/<role>) or a project-level custom role (projects/<project>/roles/<roleId>)."
+    condition     = can(regex("^[1-9][0-9]*s$", var.break_glass_recovery.max_request_duration))
+    error_message = "break_glass_recovery.max_request_duration must be a duration in the platform's seconds form (for example \"7200s\")."
   }
 
   validation {
-    condition     = can(timecmp(var.break_glass_recovery.condition_end_time, "1970-01-01T00:00:00Z"))
-    error_message = "break_glass_recovery.condition_end_time must be a valid RFC 3339 timestamp."
+    condition = (
+      length(var.break_glass_recovery.approvers) > 0
+      && alltrue([for principal in var.break_glass_recovery.approvers : can(regex("^(user|group|serviceAccount):[^\\s]+$", principal))])
+    )
+    error_message = "break_glass_recovery.approvers must carry at least one approver principal in the user:, group: or serviceAccount: form; every activation is approval-bound."
   }
 }

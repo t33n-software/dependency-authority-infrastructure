@@ -80,15 +80,17 @@ module "forensics_readers" {
 }
 
 # The recovery identity of the quarantine zone: the dedicated identity whose
-# elevated project role exists only under the mandatory time-bound IAM
-# condition. It is never used in normal operation, never federated from CI and
-# holds no data-plane grant; every use is an audited incident action with a
-# recorded decision. The role and the end time are approved instance
+# elevated capability exists only as the declared, dormant privileged-access
+# entitlement — never a standing grant. It is never used in normal operation,
+# never federated from CI and holds no data-plane grant; every use is an
+# audited incident action with a recorded decision, and every activation is
+# approval- and justification-bound and time-boxed by the platform-enforced
+# grant duration. The duration and the approver set are approved instance
 # decisions, supplied through the instance-bound input.
 module "recovery" {
   source     = "../../modules/recovery"
   project_id = var.project_id
 
-  role               = var.break_glass_recovery.role
-  condition_end_time = var.break_glass_recovery.condition_end_time
+  max_request_duration = var.break_glass_recovery.max_request_duration
+  approvers            = var.break_glass_recovery.approvers
 }
