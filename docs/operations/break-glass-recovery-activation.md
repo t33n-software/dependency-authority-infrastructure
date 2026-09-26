@@ -54,9 +54,16 @@ audited, and the grant auto-expires at the end of the activation window.
    read-back:
 
    ```powershell
-   gcloud iam service-accounts add-iam-policy-binding "<BREAK_GLASS_SA_EMAIL>" --member="user:<OPERATOR>" --role="roles/iam.serviceAccountUser" --format=none
+   gcloud iam service-accounts add-iam-policy-binding "<BREAK_GLASS_SA_EMAIL>" --member="user:<OPERATOR>" --role="roles/iam.serviceAccountTokenCreator" --format=none
    gcloud iam service-accounts get-iam-policy "<BREAK_GLASS_SA_EMAIL>"
    ```
+
+   The impersonation capability is the token-creation capability: the
+   impersonated request mints an access token for the break-glass identity,
+   which requires `iam.serviceAccounts.getAccessToken` — carried exclusively
+   by `roles/iam.serviceAccountTokenCreator`. The user role
+   (`roles/iam.serviceAccountUser`) carries `iam.serviceAccounts.actAs` but
+   not `iam.serviceAccounts.getAccessToken` and cannot mint the token.
 
 2. Request the grant as the break-glass identity (impersonated), with the
    justification recorded:
@@ -92,7 +99,7 @@ audited, and the grant auto-expires at the end of the activation window.
    read-back:
 
    ```powershell
-   gcloud iam service-accounts remove-iam-policy-binding "<BREAK_GLASS_SA_EMAIL>" --member="user:<OPERATOR>" --role="roles/iam.serviceAccountUser" --format=none
+   gcloud iam service-accounts remove-iam-policy-binding "<BREAK_GLASS_SA_EMAIL>" --member="user:<OPERATOR>" --role="roles/iam.serviceAccountTokenCreator" --format=none
    gcloud iam service-accounts get-iam-policy "<BREAK_GLASS_SA_EMAIL>"
    ```
 
