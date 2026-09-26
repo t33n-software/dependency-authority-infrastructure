@@ -21,30 +21,40 @@ variable "description" {
   default     = "Time-bounded, audited break-glass identity of the dependency authority; never used in normal operation."
 }
 
-variable "role" {
-  description = "Project-level role the break-glass identity receives under the time-bound condition. The exact role is an approved instance decision."
+variable "entitlement_id" {
+  description = "Entitlement ID of the break-glass recovery privileged-access entitlement (the platform form: 4-63 characters of lowercase letters, digits and hyphens, beginning with a letter). The identity class name is canonical; the core carries it, never the instance."
   type        = string
-}
-
-variable "condition_end_time" {
-  description = "RFC 3339 UTC timestamp after which the break-glass grant stops applying, for example 2027-01-01T00:00:00Z. Time-boundedness is mandatory."
-
-  type = string
+  default     = "dep-break-glass-recovery-admin"
 
   validation {
-    condition     = can(timecmp(var.condition_end_time, "1970-01-01T00:00:00Z"))
-    error_message = "condition_end_time must be a valid RFC 3339 timestamp."
+    condition     = can(regex("^[a-z][a-z0-9-]{3,62}$", var.entitlement_id))
+    error_message = "entitlement_id must satisfy the platform form: 4-63 characters of lowercase letters, digits and hyphens, beginning with a letter."
   }
 }
 
-variable "condition_title" {
-  description = "Title of the IAM condition that bounds the break-glass grant."
+variable "max_request_duration" {
+  description = "The per-activation grant duration of the break-glass entitlement in the platform's seconds form (for example \"7200s\"): the platform-enforced time-box of every activation — never an IAM condition, which platforms reject on primitive roles. The organization instance binds the canonical time-box value as an approved decision; the core never presets it."
   type        = string
-  default     = "time-bounded-break-glass"
+
+  validation {
+    condition     = can(regex("^[1-9][0-9]*s$", var.max_request_duration))
+    error_message = "max_request_duration must be a duration in the platform's seconds form (for example \"7200s\")."
+  }
 }
 
-variable "condition_description" {
-  description = "Description of the IAM condition that bounds the break-glass grant."
-  type        = string
-  default     = "The grant expires automatically at the approved end time; usage is audited and reviewed."
+variable "approvers" {
+  description = "The approver principal set of the entitlement's approval workflow in the user:, group: or serviceAccount: form: every activation is approval- and justification-bound. The organization instance binds the set as an approved decision — distinct from the eligible principal in the target form; any self-approval is a documented, expiring interim state, never the target. The core never presets it."
+  type        = set(string)
+
+  validation {
+    condition     = length(var.approvers) > 0
+    error_message = "approvers must carry at least one approver principal; the approval duty of every activation is mandatory."
+  }
+
+  validation {
+    condition = alltrue([
+      for principal in var.approvers : can(regex("^(user|group|serviceAccount):[^\\s]+$", principal))
+    ])
+    error_message = "every approver must be a principal in the user:, group: or serviceAccount: form."
+  }
 }

@@ -104,10 +104,11 @@ infrastructure core.
                                           reader on release-controller-images
    dep-evidence-auditor         evidence  reader on *-dependencies-evidence;
                                           reader on release-controller-images
-   dep-break-glass-recovery     all zones no data-plane grant: time-bounded
-                                          break-glass recovery only, never
-                                          federated from CI — one dedicated
-                                          identity per zone project
+   dep-break-glass-recovery     all zones no data-plane grant: break-glass
+                                           recovery through the dormant
+                                           privileged-access entitlement only,
+                                           never federated from CI — one
+                                           dedicated identity per zone project
    ```
 
    The matrix binds its exclusions with the same force: the quarantine
@@ -258,15 +259,16 @@ infrastructure core.
     chain's forward path as drift. The declaration binds the consistency
     fail-closed: the activation set references only declared jobs of the
     zone topology (proven against the pinned engine), and the module's
-    fail-closed image validation keeps an activated job always on a proven
-    immutable digest. The activation of a planned surface is a reviewed
-    change of the instance binding — the same governed form as every
-    binding change. Every zone stack declares the recovery identity of its
-    zone through the recovery module (decision 15): the dedicated identity
-    whose elevated project role exists only under the mandatory time-bound
-    IAM condition, never federated from CI and never carrying a data-plane
-    grant, with the role and the end time as approved instance decisions
-    supplied through the `break_glass_recovery` input.
+     fail-closed image validation keeps an activated job always on a proven
+     immutable digest. The activation of a planned surface is a reviewed
+     change of the instance binding — the same governed form as every
+     binding change. Every zone stack declares the recovery identity of its
+     zone through the recovery module (decision 15): the dedicated identity
+     whose elevated capability exists only as the declared, dormant
+     privileged-access entitlement (never a standing grant), never
+     federated from CI and never carrying a data-plane grant, with the
+     per-activation duration and the approver set as approved instance
+     decisions supplied through the `break_glass_recovery` input.
 14. The workload image registries carry the declared, platform-executed
     workload image lifecycle of the workload image lifecycle and retention
     convention: the artifact-registry module owns the cleanup policy surface
@@ -299,18 +301,45 @@ infrastructure core.
      declared by the zone's own stack through the recovery module and bound
      to that project. The identity is standing but dormant: never used in
      normal operation, never federated from CI and never carrying a
-     data-plane grant; its elevated project role exists only under the
-     mandatory time-bound IAM condition, and an unbounded grant is a
-     contract violation. The role and the end time are approved instance
-     decisions supplied through the `break_glass_recovery` input of every
-     zone stack (never stack defaults), and every re-binding of the end
-     time is a reviewed instance change. The identity is not a fourth
-     operator access class: the JIT window is the planned mutation path,
-     the break-glass identity is the disaster path. A zone never depends on
+     data-plane grant; its elevated capability exists only as the declared
+     privileged-access entitlement on the zone project — never a standing
+     grant. The entitlement binds the curated predefined-role set of the
+     zone's declared surface as the privileged access: the set is derived
+     from the uniform module inventory of the zone stacks and proven
+     complete by the packaging contract guard, which maps every declared
+     resource class to its covering administrative role and fails closed
+     while any class is uncovered, so a growing declaration forces the set
+     to grow with it; the set never carries a legacy basic role. Every
+     activation is approval- and justification-bound and time-boxed per
+     activation through the platform-enforced grant duration
+     (`max_request_duration`), and the grant auto-expires at the end of the
+     activation window; an unbounded or standing break-glass grant is a
+     contract violation. The time-binding lives in the grant duration of
+     the privileged-access mechanism, never in an IAM condition: the
+     platform rejects IAM conditions on primitive roles (proven by the live
+     apply rejection), and the privileged-access mechanism does not admit
+     the legacy basic roles (owner, editor, viewer) at all (proven against
+     the official Privileged Access Manager documentation) — both forms are
+     proven non-deployable, never assumed. The per-activation duration and
+     the approver principal set are approved instance decisions supplied
+     through the `break_glass_recovery` input of every zone stack (never
+     stack defaults), the approver set is distinct from the eligible
+     principal by default (any self-approval is a documented, expiring
+     interim state, never the target), and every re-binding of the duration
+     is a reviewed instance change. The identity is not a fourth operator
+     access class: the JIT window is the planned mutation path, the
+     break-glass identity is the disaster path. A zone never depends on
      another zone's recovery surface, because the disaster form is by
      definition unknown and the recovery guarantee must be total within the
-     zone boundary; the behavioral rejection proofs of the binding live
-     beside every stack.
+     zone boundary; a disaster beyond the declared surface escalates to the
+     organization plane. The activation path is proven by exercise, never
+     by existence alone: the drill
+     (docs/operations/break-glass-recovery-activation.md) activates the
+     entitlement, proves the elevated capability and lets the grant expire —
+     a reviewed operational event whose evidence lands in the evidence
+     plane. The behavioral rejection proofs of the binding live beside
+     every stack, and the module fixture proves the input validations
+     offline.
  16. Every managed resource of the declaration plane declares the canonical
      human-readable description surface of its provider schema (the mandatory
      description duty of the mandatory resource properties convention): the

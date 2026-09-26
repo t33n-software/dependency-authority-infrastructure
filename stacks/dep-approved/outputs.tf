@@ -27,3 +27,8 @@ output "break_glass_recovery_service_account_email" {
   description = "Email of the time-bound recovery identity of the approved zone (dep-break-glass-recovery)."
   value       = module.recovery.service_account_email
 }
+
+output "break_glass_recovery_entitlement_name" {
+  description = "Resource name of the recovery entitlement of the approved zone — the activation, approval and read-back surface of the recovery drill."
+  value       = module.recovery.entitlement_name
+}

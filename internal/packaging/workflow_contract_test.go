@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -214,7 +215,7 @@ func TestOrganizationRulesetAdoptionHasNoLocalLegacyDefinitions(t *testing.T) {
 		t.Fatalf("legacy ruleset location must not exist")
 	}
 
-	conventions := readRepositoryFile(t, filepath.Join("docs", "conventions", "hosting-plattform", "github", "rule-sets", "README.md"))
+	conventions := readRepositoryFile(t, filepath.Join("docs", "conventions", "hosting-platforms", "github", "rule-sets", "README.md"))
 	for _, required := range []string{
 		"git-governance",
 		"quality-gates=linux-only",
@@ -309,7 +310,7 @@ func TestCoreContainsNoConcreteBindings(t *testing.T) {
 		".github/workflows/dependency-review.yml",
 		".github/workflows/canonical-conformance.yml",
 		"repo-bindings.json",
-		"docs/conventions/hosting-plattform/github/rule-sets/README.md",
+		"docs/conventions/hosting-platforms/github/rule-sets/README.md",
 		"docs/TRACEABILITY.md",
 		"lefthook.yml",
 		"license.values.json",
@@ -777,11 +778,63 @@ func TestStacksBindTheWorkloadJobActivationGate(t *testing.T) {
 	}
 }
 
+// The covering administrative role of every declared resource class of the
+// zone stacks, per the provider's permission authority (proven against the
+// official IAM role documentation and the live role content read-back, never
+// assumed): the break-glass entitlement binds the union of these roles plus
+// the named bound-surface additions as its privileged access. A declared class
+// without its covering role fails closed, and a growing declaration forces the
+// set to grow with it.
+var recoveryCoveringRoles = map[string]string{
+	"google_artifact_registry_repository":            "roles/artifactregistry.admin",
+	"google_artifact_registry_vpcsc_config":          "roles/artifactregistry.admin",
+	"google_artifact_registry_repository_iam_member": "roles/artifactregistry.admin",
+	"google_cloud_run_v2_job":                        "roles/run.admin",
+	"google_cloud_run_v2_job_iam_member":             "roles/run.admin",
+	"google_compute_firewall":                        "roles/compute.securityAdmin",
+	"google_compute_network":                         "roles/compute.networkAdmin",
+	"google_compute_subnetwork":                      "roles/compute.networkAdmin",
+	"google_dns_managed_zone":                        "roles/dns.admin",
+	"google_dns_record_set":                          "roles/dns.admin",
+	"google_dns_response_policy":                     "roles/dns.admin",
+	"google_dns_response_policy_rule":                "roles/dns.admin",
+	"google_iam_workload_identity_pool":              "roles/iam.workloadIdentityPoolAdmin",
+	"google_iam_workload_identity_pool_provider":     "roles/iam.workloadIdentityPoolAdmin",
+	"google_logging_project_sink":                    "roles/logging.configWriter",
+	"google_org_policy_policy":                       "roles/orgpolicy.policyAdmin",
+	"google_privileged_access_manager_entitlement":   "roles/privilegedaccessmanager.admin",
+	"google_project_iam_member":                      "roles/resourcemanager.projectIamAdmin",
+	"google_service_account":                         "roles/iam.serviceAccountAdmin",
+	"google_service_account_iam_member":              "roles/iam.serviceAccountAdmin",
+	"google_storage_bucket":                          "roles/storage.admin",
+	"google_storage_bucket_iam_member":               "roles/storage.admin",
+}
+
+// The named bound-surface additions: the zone's declared surface binds the
+// CMEK and state-encryption key surfaces (the evidence archive encryption and
+// the state backend encryption) and the service-enablement surface (the zone
+// capability floor) without declaring them as resources of the zone stacks;
+// the recovery totality covers them through these roles.
+var recoveryBoundSurfaceRoles = []string{
+	"roles/cloudkms.admin",
+	"roles/serviceusage.serviceUsageAdmin",
+}
+
+// The org-plane exception: the forensics perimeter ingress policy is declared
+// by the control-zone stack but administers the organization-plane perimeter;
+// its recovery escalates to the organization plane (the organization-plane
+// recovery convention), never to a zone role.
+var recoveryOrgPlaneClasses = []string{
+	"google_access_context_manager_service_perimeter_ingress_policy",
+}
+
 func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 	// Every trust zone declares its own break-glass recovery identity through
 	// the recovery module, bound to the zone's own project: the dedicated,
-	// dormant identity whose elevated project role exists only under the
-	// mandatory time-bound IAM condition, with the role and the end time as
+	// dormant identity whose elevated capability exists only as the declared
+	// privileged-access entitlement — approval- and justification-bound and
+	// time-boxed per activation through the platform-enforced grant duration,
+	// never a standing grant — with the duration and the approver set as
 	// approved instance decisions.
 	for _, stack := range stackNames {
 		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
@@ -791,11 +844,21 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		for _, required := range []string{
 			`source = "../../modules/recovery"`,
 			`project_id = var.project_id`,
-			`role = var.break_glass_recovery.role`,
-			`condition_end_time = var.break_glass_recovery.condition_end_time`,
+			`max_request_duration = var.break_glass_recovery.max_request_duration`,
+			`approvers = var.break_glass_recovery.approvers`,
 		} {
 			if !strings.Contains(main, required) {
 				t.Fatalf("stacks/%s/main.tf does not declare the recovery binding element %q", stack, required)
+			}
+		}
+		for _, forbidden := range []string{
+			`role = var.break_glass_recovery.role`,
+			"condition_end_time",
+			"condition_title",
+			"condition_description",
+		} {
+			if strings.Contains(main, forbidden) {
+				t.Fatalf("stacks/%s/main.tf still carries the retired recovery form element %q; the entitlement form carries no IAM condition and no standing role grant", stack, forbidden)
 			}
 		}
 
@@ -809,16 +872,24 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 			segment = segment[:next]
 		}
 		if strings.Contains(segment, "default") {
-			t.Fatalf("stacks/%s/variables.tf carries a default for break_glass_recovery; the role and the end time are approved instance decisions, never stack defaults", stack)
+			t.Fatalf("stacks/%s/variables.tf carries a default for break_glass_recovery; the duration and the approver set are approved instance decisions, never stack defaults", stack)
 		}
 		for _, required := range []string{
-			`role = string`,
-			`condition_end_time = string`,
-			`can(regex("^roles/[A-Za-z][A-Za-z0-9._]+$", var.break_glass_recovery.role))`,
-			`can(timecmp(var.break_glass_recovery.condition_end_time, "1970-01-01T00:00:00Z"))`,
+			`max_request_duration = string`,
+			`approvers = set(string)`,
+			`can(regex("^[1-9][0-9]*s$", var.break_glass_recovery.max_request_duration))`,
+			`length(var.break_glass_recovery.approvers) > 0`,
 		} {
 			if !strings.Contains(segment, required) {
 				t.Fatalf("stacks/%s/variables.tf does not bind the recovery element %q", stack, required)
+			}
+		}
+		for _, forbidden := range []string{
+			`role = string`,
+			"condition_end_time",
+		} {
+			if strings.Contains(segment, forbidden) {
+				t.Fatalf("stacks/%s/variables.tf still carries the retired recovery input element %q", stack, forbidden)
 			}
 		}
 
@@ -829,14 +900,25 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		if !strings.Contains(outputs, `value = module.recovery.service_account_email`) {
 			t.Fatalf("stacks/%s/outputs.tf does not wire the recovery identity email to the module", stack)
 		}
+		if !strings.Contains(outputs, `output "break_glass_recovery_entitlement_name"`) {
+			t.Fatalf("stacks/%s/outputs.tf does not export the recovery entitlement name", stack)
+		}
+		if !strings.Contains(outputs, `value = module.recovery.entitlement_name`) {
+			t.Fatalf("stacks/%s/outputs.tf does not wire the recovery entitlement name to the module", stack)
+		}
 
 		// The behavioral proof of the recovery binding lives beside the code.
 		fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tofutest.hcl")))
-		if !strings.Contains(fixture, "break_glass_recovery = {") {
-			t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the synthetic recovery binding", stack)
-		}
-		if !strings.Contains(fixture, "expect_failures = [var.break_glass_recovery]") {
-			t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the rejection run of the recovery binding", stack)
+		for _, required := range []string{
+			"break_glass_recovery = {",
+			`max_request_duration = "7200s"`,
+			`run "rejects_an_invalid_recovery_duration"`,
+			`run "rejects_an_empty_recovery_approver_set"`,
+			"expect_failures = [var.break_glass_recovery]",
+		} {
+			if !strings.Contains(fixture, required) {
+				t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the recovery proof element %q", stack, required)
+			}
 		}
 
 		readme := readRepositoryFile(t, filepath.Join("stacks", stack, "README.md"))
@@ -846,21 +928,218 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		if !strings.Contains(readme, "recovery identity") {
 			t.Fatalf("the %s stack README does not document the recovery identity boundary", stack)
 		}
+		if !strings.Contains(readme, "privileged-access entitlement") {
+			t.Fatalf("the %s stack README does not document the privileged-access entitlement form", stack)
+		}
 	}
 
-	// The architecture decision record carries the per-zone decision.
+	// The module owns the entitlement form: the declared privileged-access
+	// resource, dormant until activated, never a standing IAM grant.
+	moduleMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "recovery", "main.tf")))
+	for _, required := range []string{
+		`resource "google_privileged_access_manager_entitlement" "this"`,
+		`parent = "projects/${var.project_id}"`,
+		`location = "global"`,
+		`entitlement_id = var.entitlement_id`,
+		`max_request_duration = var.max_request_duration`,
+		"eligible_users {",
+		`principals = ["serviceAccount:${google_service_account.this.email}"]`,
+		"privileged_access {",
+		"gcp_iam_access {",
+		`resource = "//cloudresourcemanager.googleapis.com/projects/${var.project_id}"`,
+		`resource_type = "cloudresourcemanager.googleapis.com/Project"`,
+		"for_each = toset(local.break_glass_recovery_roles)",
+		"requester_justification_config {",
+		"unstructured {",
+		"approval_workflow {",
+		"manual_approvals {",
+		"require_approver_justification = true",
+		"approvals_needed = 1",
+		"principals = var.approvers",
+	} {
+		if !strings.Contains(moduleMain, required) {
+			t.Fatalf("modules/recovery/main.tf does not declare the entitlement form element %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"google_project_iam_member",
+		"condition {",
+		"var.condition_end_time",
+		"var.condition_title",
+		"var.condition_description",
+		"var.role",
+		"roles/owner",
+		"roles/editor",
+		`roles/viewer"`,
+	} {
+		if strings.Contains(moduleMain, forbidden) {
+			t.Fatalf("modules/recovery/main.tf still carries the retired or forbidden form element %q; the platform rejects IAM conditions on primitive roles, and the privileged-access mechanism admits no legacy basic role", forbidden)
+		}
+	}
+
+	moduleVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "recovery", "variables.tf")))
+	for _, required := range []string{
+		`variable "entitlement_id" {`,
+		`variable "max_request_duration" {`,
+		`variable "approvers" {`,
+		`can(regex("^[a-z][a-z0-9-]{3,62}$", var.entitlement_id))`,
+		`can(regex("^[1-9][0-9]*s$", var.max_request_duration))`,
+		"length(var.approvers) > 0",
+	} {
+		if !strings.Contains(moduleVariables, required) {
+			t.Fatalf("modules/recovery/variables.tf does not bind the entitlement input element %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		`variable "role"`,
+		`variable "condition_end_time"`,
+		`variable "condition_title"`,
+		`variable "condition_description"`,
+	} {
+		if strings.Contains(moduleVariables, forbidden) {
+			t.Fatalf("modules/recovery/variables.tf still carries the retired input %q", forbidden)
+		}
+	}
+	// The duration and the approver set are approved instance decisions, never
+	// module defaults.
+	for _, name := range []string{"max_request_duration", "approvers"} {
+		start := strings.Index(moduleVariables, `variable "`+name+`" {`)
+		if start < 0 {
+			t.Fatalf("modules/recovery/variables.tf does not carry the %s input", name)
+		}
+		segment := moduleVariables[start:]
+		if next := strings.Index(segment, ` variable "`); next > 0 {
+			segment = segment[:next]
+		}
+		if strings.Contains(segment, "default") {
+			t.Fatalf("modules/recovery/variables.tf carries a default for %s; the value is an approved instance decision, never a default", name)
+		}
+	}
+
+	moduleOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "recovery", "outputs.tf")))
+	if !strings.Contains(moduleOutputs, `output "entitlement_name"`) {
+		t.Fatal("modules/recovery/outputs.tf does not export the entitlement resource name")
+	}
+	if strings.Contains(moduleOutputs, `output "condition_end_time"`) {
+		t.Fatal("modules/recovery/outputs.tf still exports the retired condition end time")
+	}
+
+	// The behavioral proof of the module validations lives beside the module
+	// and executes offline (the module carries no backend and no encryption
+	// block).
+	moduleFixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "recovery", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`run "accepts_the_canonical_recovery_binding"`,
+		`run "rejects_an_invalid_entitlement_id"`,
+		`run "rejects_an_invalid_request_duration"`,
+		`run "rejects_an_empty_approver_set"`,
+		`run "rejects_a_malformed_approver_principal"`,
+		"expect_failures = [var.entitlement_id]",
+		"expect_failures = [var.max_request_duration]",
+		"expect_failures = [var.approvers]",
+	} {
+		if !strings.Contains(moduleFixture, required) {
+			t.Fatalf("modules/recovery/variables.tofutest.hcl does not carry the proof element %q", required)
+		}
+	}
+
+	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "recovery", "README.md"))
+	for _, required := range []string{"privileged-access entitlement", "max_request_duration", "approvers", "never a standing grant", "drill"} {
+		if !strings.Contains(moduleReadme, required) {
+			t.Fatalf("the recovery module README does not document %q of the entitlement form", required)
+		}
+	}
+
+	// The coverage matrix: every declared resource class of every module maps
+	// to its covering administrative role, and the module's entitlement binds
+	// exactly the union of the covering roles plus the named bound-surface
+	// additions — fail-closed in both directions, so a growing declaration
+	// forces the set to grow with it.
+	declaredClasses := map[string]bool{}
+	for _, root := range append([]string{"policy-bindings"}, modulePaths()...) {
+		content := normalizeWhitespace(readRepositoryFile(t, filepath.Join(root, "main.tf")))
+		for _, match := range regexp.MustCompile(`resource "(google_[a-z0-9_]+)"`).FindAllStringSubmatch(content, -1) {
+			declaredClasses[match[1]] = true
+		}
+	}
+	for class := range declaredClasses {
+		if _, covered := recoveryCoveringRoles[class]; !covered && !slices.Contains(recoveryOrgPlaneClasses, class) {
+			t.Fatalf("the declared resource class %q carries no covering administrative role in the recovery entitlement set; the coverage matrix fails closed", class)
+		}
+	}
+
+	wantRoles := map[string]bool{}
+	for _, role := range recoveryCoveringRoles {
+		wantRoles[role] = true
+	}
+	for _, role := range recoveryBoundSurfaceRoles {
+		wantRoles[role] = true
+	}
+
+	moduleMainRaw := readRepositoryFile(t, filepath.Join("modules", "recovery", "main.tf"))
+	setStart := strings.Index(moduleMainRaw, "break_glass_recovery_roles = [")
+	if setStart < 0 {
+		t.Fatal("modules/recovery/main.tf does not declare the curated role set local break_glass_recovery_roles")
+	}
+	setSegment := moduleMainRaw[setStart:]
+	if next := strings.Index(setSegment, "]"); next > 0 {
+		setSegment = setSegment[:next]
+	}
+	gotRoles := map[string]bool{}
+	for _, match := range regexp.MustCompile(`"(roles/[^"]+)"`).FindAllStringSubmatch(setSegment, -1) {
+		gotRoles[match[1]] = true
+	}
+	for role := range wantRoles {
+		if !gotRoles[role] {
+			t.Fatalf("the recovery entitlement set misses the covering role %q; the set is derived from the declared module inventory, never by hand", role)
+		}
+	}
+	for role := range gotRoles {
+		if !wantRoles[role] {
+			t.Fatalf("the recovery entitlement set carries %q without a declared or bound surface; every role must cover a declared class or a named bound surface", role)
+		}
+	}
+	for _, basic := range []string{"roles/owner", "roles/editor", "roles/viewer"} {
+		if gotRoles[basic] {
+			t.Fatalf("the recovery entitlement set carries the legacy basic role %q; the privileged-access mechanism does not admit it", basic)
+		}
+	}
+
+	// The architecture decision record carries the evolved per-zone decision.
 	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
 	for _, required := range []string{
 		"Every trust zone",
 		"break-glass recovery identity",
 		"one per zone project",
+		"privileged-access entitlement",
+		"never a standing grant",
+		"approval- and justification-bound",
+		"platform-enforced grant duration",
 	} {
 		if !strings.Contains(adr, required) {
-			t.Fatalf("ADR-0001 does not carry the per-zone recovery decision element %q", required)
+			t.Fatalf("ADR-0001 does not carry the evolved recovery decision element %q", required)
+		}
+	}
+
+	// The operations runbook carries the activation and drill form.
+	runbook := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "operations", "break-glass-recovery-activation.md")))
+	for _, required := range []string{
+		"gcloud pam grants create",
+		"--requested-duration",
+		"--justification",
+		"--impersonate-service-account",
+		"approve",
+		"expire",
+	} {
+		if !strings.Contains(runbook, required) {
+			t.Fatalf("docs/operations/break-glass-recovery-activation.md does not carry the drill element %q", required)
 		}
 	}
 
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-34") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-34")
+	}
 	if !strings.Contains(traceability, "DAI-26") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-26")
 	}

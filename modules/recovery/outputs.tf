@@ -8,7 +8,7 @@ output "service_account_name" {
   value       = google_service_account.this.name
 }
 
-output "condition_end_time" {
-  description = "RFC 3339 timestamp after which the break-glass grant stops applying."
-  value       = var.condition_end_time
+output "entitlement_name" {
+  description = "Resource name of the break-glass recovery entitlement — the activation, approval and read-back surface of the recovery drill."
+  value       = google_privileged_access_manager_entitlement.this.name
 }
