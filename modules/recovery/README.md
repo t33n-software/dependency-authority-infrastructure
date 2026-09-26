@@ -23,8 +23,18 @@ privileged-access entitlement — never a standing grant.
   non-deployable.
 - The role set is derived from the zone's declared module inventory and proven
   complete by the infrastructure core's contract guard — never instance-bound;
-  the per-activation duration and the approver set are approved instance
+  it carries only project-grantable roles: a class whose covering capability
+  lives above the project level (the organization policies) is proven covered
+  by the organization plane and is never forced into the zone set. The
+  per-activation duration and the approver set are approved instance
   decisions, and the core never presets them.
+- The module declares the standing platform setup of the privileged-access
+  surface: the organization-level Privileged Access Manager service agent
+  (derived from the instance-bound organization number) holds the project
+  service-agent role on the zone project — engine-managed, never a window
+  grant. The API activation and the agent's existence precede the apply
+  through the governed operator channel (the instance declares the API in the
+  zone's capability floor).
 - The activation path is proven by exercise, never by existence alone: the
   drill activates the entitlement, proves the elevated capability and lets the
   grant expire — the activation and proof form lives in
@@ -37,6 +47,7 @@ module "break_glass" {
   source = "git::https://github.com/<organization>/dependency-authority-infrastructure//modules/recovery?ref=<exact-version>"
 
   project_id           = "<organization>-dep-evidence"
+  organization_number  = "<organization-number>" # the numeric organization number
   max_request_duration = "<approved-per-activation-duration>" # for example "7200s"
   approvers            = ["<approved-approver-principal>"]    # for example "group:<approver-group>"
 }

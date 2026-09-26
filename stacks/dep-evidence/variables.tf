@@ -13,6 +13,16 @@ variable "project_number" {
   }
 }
 
+variable "organization_number" {
+  description = "Numeric organization number of the Google Cloud organization carrying the zone: the platform embeds it in the organization-level Privileged Access Manager service agent identity (service-org-<number>@gcp-sa-pam.iam.gserviceaccount.com), bound on the zone project as the standing platform setup of the privileged-access surface. Supplied by the organization instance; the core never presets it."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.organization_number))
+    error_message = "organization_number must be the numeric Google Cloud organization number."
+  }
+}
+
 variable "location" {
   description = "Artifact Registry location of the evidence repositories, Cloud Storage location of the retention archive and the job region of the zone workload network."
   type        = string

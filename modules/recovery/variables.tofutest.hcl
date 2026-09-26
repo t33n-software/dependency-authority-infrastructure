@@ -6,6 +6,7 @@
 
 variables {
   project_id           = "test-dep-control"
+  organization_number  = "900000000001"
   max_request_duration = "7200s"
   approvers            = ["group:dep-break-glass-approvers@example.com"]
 }
@@ -26,6 +27,25 @@ run "accepts_the_canonical_recovery_binding" {
     condition     = var.entitlement_id == "dep-break-glass-recovery-admin"
     error_message = "The entitlement ID must default to the canonical identity class name."
   }
+
+  assert {
+    condition     = var.organization_number == "900000000001"
+    error_message = "The validation must accept the numeric organization number."
+  }
+}
+
+run "rejects_a_non_numeric_organization_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    organization_number = "test-organization"
+  }
+
+  expect_failures = [var.organization_number]
 }
 
 run "rejects_an_invalid_entitlement_id" {

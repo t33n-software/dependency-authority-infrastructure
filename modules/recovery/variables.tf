@@ -3,6 +3,16 @@ variable "project_id" {
   type        = string
 }
 
+variable "organization_number" {
+  description = "Numeric organization number of the Google Cloud organization carrying the zone: the platform embeds it in the organization-level Privileged Access Manager service agent identity (service-org-<number>@gcp-sa-pam.iam.gserviceaccount.com), which the module binds on the zone project as the standing platform setup of the privileged-access surface. The organization instance supplies this value; the core never presets it."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.organization_number))
+    error_message = "organization_number must be the numeric Google Cloud organization number."
+  }
+}
+
 variable "service_account_id" {
   description = "Service account ID of the break-glass recovery identity."
   type        = string

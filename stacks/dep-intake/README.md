@@ -81,7 +81,7 @@ remote repositories' configured upstreams; never a perimeter egress rule).
 
 ## Inputs
 
-`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `location`, `ecosystems` (default `["go"]`), `pool_id`,
+`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `organization_number` (the instance-bound numeric organization number carried by the zone's privileged-access platform setup), `location`, `ecosystems` (default `["go"]`), `pool_id`,
 `fetcher` (OIDC bindings of the intake fetcher), `additional_reader_members`
 (the matrix-bound control-plane readers), `workload_job_images`
 (the instance-bound image digests keyed by canonical job name),

@@ -12,9 +12,10 @@
 # file, and every value assigned here is synthetic test data.
 
 variables {
-  project_id     = "test-dep-approved"
-  project_number = "100000000040"
-  location       = "europe-west1"
+  project_id          = "test-dep-approved"
+  project_number      = "100000000040"
+  organization_number = "900000000001"
+  location            = "europe-west1"
 
   promoter_member            = "serviceAccount:dep-approved-promoter@test-dep-control.iam.gserviceaccount.com"
   revocation_member          = "serviceAccount:dep-revocation-controller@test-dep-control.iam.gserviceaccount.com"
@@ -162,4 +163,31 @@ run "rejects_a_non_numeric_project_number" {
   }
 
   expect_failures = [var.project_number]
+}
+
+run "accepts_a_numeric_organization_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.organization_number == "900000000001"
+    error_message = "The validation must accept the numeric Google Cloud organization number."
+  }
+}
+
+run "rejects_a_non_numeric_organization_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    organization_number = "test-dep-approved"
+  }
+
+  expect_failures = [var.organization_number]
 }

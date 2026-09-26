@@ -26,6 +26,15 @@ audited, and the grant auto-expires at the end of the activation window.
 
 ## Prerequisites
 
+- The privileged-access platform setup of the zone is provisioned and proven:
+  the engine-declared service-agent binding exists (the organization-level
+  Privileged Access Manager service agent holds the project service-agent role
+  on the zone project), and the onboarding status reports no findings:
+
+  ```powershell
+  gcloud pam check-onboarding-status --project="<PROJECT_ID>" --location=global
+  ```
+
 - The entitlement of the zone is provisioned and proven by read-back:
 
   ```powershell

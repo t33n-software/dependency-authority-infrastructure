@@ -4,7 +4,12 @@
 # its covering administrative role, and a growing declaration forces the set to
 # grow with it. Never a legacy basic role: the privileged-access mechanism does
 # not admit owner, editor or viewer, and platforms reject IAM conditions on
-# primitive roles — both forms are proven non-deployable.
+# primitive roles — both forms are proven non-deployable. A class whose covering
+# capability lives above the project level is never forced into the set: the
+# organization policies are administered by the organization plane (their
+# covering role is grantable only at organization level — proven non-grantable
+# in a project-scoped entitlement by the live apply rejection), so their
+# recovery escalates to the organization-plane recovery surface.
 locals {
   break_glass_recovery_roles = [
     "roles/artifactregistry.admin",
@@ -15,13 +20,17 @@ locals {
     "roles/iam.serviceAccountAdmin",
     "roles/iam.workloadIdentityPoolAdmin",
     "roles/logging.configWriter",
-    "roles/orgpolicy.policyAdmin",
     "roles/privilegedaccessmanager.admin",
     "roles/resourcemanager.projectIamAdmin",
     "roles/run.admin",
     "roles/serviceusage.serviceUsageAdmin",
     "roles/storage.admin",
   ]
+
+  # The organization-level Privileged Access Manager service agent identity,
+  # derived from the instance-bound organization number: the platform embeds
+  # the number in the agent's email form.
+  pam_service_agent_email = "service-org-${var.organization_number}@gcp-sa-pam.iam.gserviceaccount.com"
 }
 
 resource "google_service_account" "this" {
@@ -79,4 +88,17 @@ resource "google_privileged_access_manager_entitlement" "this" {
       }
     }
   }
+}
+
+# The platform setup of the privileged-access surface: the organization-level
+# Privileged Access Manager service agent holds the project service-agent role
+# on the zone project — a standing platform requirement of the service,
+# declared here and engine-managed, never a window grant and never a recovery
+# capability of the break-glass identity. The API activation and the agent's
+# existence precede the apply through the governed operator channel (the
+# instance declares the API in the zone's capability floor).
+resource "google_project_iam_member" "pam_service_agent" {
+  project = var.project_id
+  role    = "roles/privilegedaccessmanager.projectServiceAgent"
+  member  = "serviceAccount:${local.pam_service_agent_email}"
 }
