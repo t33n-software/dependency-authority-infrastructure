@@ -116,7 +116,7 @@ perimeter ingress rule of the class.
 
 ## Inputs
 
-`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `location`, `pool_id`, `controllers` (the OIDC bindings and the
+`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `organization_number` (the instance-bound numeric organization number carried by the zone's privileged-access platform setup), `location`, `pool_id`, `controllers` (the OIDC bindings and the
 canonical display name and description surfaces of the controller
 identities), `workload_job_images` (the instance-bound image
 digests keyed by canonical job name), `workload_image_cleanup` (the

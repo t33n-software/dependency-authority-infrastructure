@@ -216,6 +216,7 @@ module "recovery" {
   source     = "../../modules/recovery"
   project_id = var.project_id
 
+  organization_number  = var.organization_number
   max_request_duration = var.break_glass_recovery.max_request_duration
   approvers            = var.break_glass_recovery.approvers
 }

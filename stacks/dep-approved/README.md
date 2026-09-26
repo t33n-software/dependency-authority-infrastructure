@@ -51,7 +51,7 @@ bindings of the forensics reader access class on the zone project.
 
 ## Inputs
 
-`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `location`, `ecosystems` (default `["go"]`), `pool_id`,
+`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `organization_number` (the instance-bound numeric organization number carried by the zone's privileged-access platform setup), `location`, `ecosystems` (default `["go"]`), `pool_id`,
 `identities` (default empty), the matrix-bound member inputs
 `promoter_member`, `revocation_member` and `revalidation_reader_member`,
 `consumer_members`, `break_glass_recovery` (the approved recovery binding of

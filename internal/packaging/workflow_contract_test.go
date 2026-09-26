@@ -801,7 +801,6 @@ var recoveryCoveringRoles = map[string]string{
 	"google_iam_workload_identity_pool":              "roles/iam.workloadIdentityPoolAdmin",
 	"google_iam_workload_identity_pool_provider":     "roles/iam.workloadIdentityPoolAdmin",
 	"google_logging_project_sink":                    "roles/logging.configWriter",
-	"google_org_policy_policy":                       "roles/orgpolicy.policyAdmin",
 	"google_privileged_access_manager_entitlement":   "roles/privilegedaccessmanager.admin",
 	"google_project_iam_member":                      "roles/resourcemanager.projectIamAdmin",
 	"google_service_account":                         "roles/iam.serviceAccountAdmin",
@@ -820,12 +819,18 @@ var recoveryBoundSurfaceRoles = []string{
 	"roles/serviceusage.serviceUsageAdmin",
 }
 
-// The org-plane exception: the forensics perimeter ingress policy is declared
-// by the control-zone stack but administers the organization-plane perimeter;
-// its recovery escalates to the organization plane (the organization-plane
-// recovery convention), never to a zone role.
+// The org-plane exceptions: the forensics perimeter ingress policy is declared
+// by the control-zone stack but administers the organization-plane perimeter,
+// and the organization policies of the policy-bindings module are administered
+// by the organization plane — their covering capabilities live above the
+// project level (the org-policy administration role is grantable only at
+// organization level, proven non-grantable in a project-scoped entitlement by
+// the live apply rejection). The recovery of both classes escalates to the
+// organization plane (the organization-plane recovery convention), never to a
+// zone role.
 var recoveryOrgPlaneClasses = []string{
 	"google_access_context_manager_service_perimeter_ingress_policy",
+	"google_org_policy_policy",
 }
 
 func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
@@ -844,6 +849,7 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		for _, required := range []string{
 			`source = "../../modules/recovery"`,
 			`project_id = var.project_id`,
+			`organization_number = var.organization_number`,
 			`max_request_duration = var.break_glass_recovery.max_request_duration`,
 			`approvers = var.break_glass_recovery.approvers`,
 		} {
@@ -893,6 +899,14 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 			}
 		}
 
+		orgNumberSegment := segmentFromMarker(t, variables, `variable "organization_number" {`, ` variable "`, "stacks/"+stack+"/variables.tf")
+		if strings.Contains(orgNumberSegment, "default") {
+			t.Fatalf("stacks/%s/variables.tf carries a default for organization_number; the value is an instance binding, never a stack default", stack)
+		}
+		if !strings.Contains(orgNumberSegment, `can(regex("^[0-9]+$", var.organization_number))`) {
+			t.Fatalf("stacks/%s/variables.tf does not bind the numeric validation of organization_number", stack)
+		}
+
 		outputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "outputs.tf")))
 		if !strings.Contains(outputs, `output "break_glass_recovery_service_account_email"`) {
 			t.Fatalf("stacks/%s/outputs.tf does not export the recovery identity email", stack)
@@ -915,6 +929,9 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 			`run "rejects_an_invalid_recovery_duration"`,
 			`run "rejects_an_empty_recovery_approver_set"`,
 			"expect_failures = [var.break_glass_recovery]",
+			"organization_number = \"",
+			`run "rejects_a_non_numeric_organization_number"`,
+			"expect_failures = [var.organization_number]",
 		} {
 			if !strings.Contains(fixture, required) {
 				t.Fatalf("stacks/%s/variables.tofutest.hcl does not carry the recovery proof element %q", stack, required)
@@ -930,6 +947,9 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		}
 		if !strings.Contains(readme, "privileged-access entitlement") {
 			t.Fatalf("the %s stack README does not document the privileged-access entitlement form", stack)
+		}
+		if !strings.Contains(readme, "organization_number") {
+			t.Fatalf("the %s stack README does not document the organization_number input", stack)
 		}
 	}
 
@@ -956,13 +976,31 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		"require_approver_justification = true",
 		"approvals_needed = 1",
 		"principals = var.approvers",
+		`pam_service_agent_email = "service-org-${var.organization_number}@gcp-sa-pam.iam.gserviceaccount.com"`,
 	} {
 		if !strings.Contains(moduleMain, required) {
 			t.Fatalf("modules/recovery/main.tf does not declare the entitlement form element %q", required)
 		}
 	}
+
+	// The platform setup of the privileged-access surface: the module declares
+	// the organization-level Privileged Access Manager service-agent binding on
+	// the zone project — a standing platform requirement, engine-managed, never
+	// a window grant.
+	pamSegment := segmentFromMarker(t, moduleMain, `resource "google_project_iam_member" "pam_service_agent"`, ` resource `, "modules/recovery/main.tf")
+	for _, required := range []string{
+		`project = var.project_id`,
+		`role = "roles/privilegedaccessmanager.projectServiceAgent"`,
+		`member = "serviceAccount:${local.pam_service_agent_email}"`,
+	} {
+		if !strings.Contains(pamSegment, required) {
+			t.Fatalf("modules/recovery/main.tf does not bind the privileged-access platform setup element %q", required)
+		}
+	}
+	// The retired form markers stay forbidden; the resource type
+	// google_project_iam_member itself is legitimately carried by the
+	// privileged-access platform setup binding (pinned above).
 	for _, forbidden := range []string{
-		"google_project_iam_member",
 		"condition {",
 		"var.condition_end_time",
 		"var.condition_title",
@@ -982,8 +1020,10 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		`variable "entitlement_id" {`,
 		`variable "max_request_duration" {`,
 		`variable "approvers" {`,
+		`variable "organization_number" {`,
 		`can(regex("^[a-z][a-z0-9-]{3,62}$", var.entitlement_id))`,
 		`can(regex("^[1-9][0-9]*s$", var.max_request_duration))`,
+		`can(regex("^[0-9]+$", var.organization_number))`,
 		"length(var.approvers) > 0",
 	} {
 		if !strings.Contains(moduleVariables, required) {
@@ -1000,9 +1040,9 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 			t.Fatalf("modules/recovery/variables.tf still carries the retired input %q", forbidden)
 		}
 	}
-	// The duration and the approver set are approved instance decisions, never
-	// module defaults.
-	for _, name := range []string{"max_request_duration", "approvers"} {
+	// The duration, the approver set and the organization number are approved
+	// instance decisions, never module defaults.
+	for _, name := range []string{"max_request_duration", "approvers", "organization_number"} {
 		start := strings.Index(moduleVariables, `variable "`+name+`" {`)
 		if start < 0 {
 			t.Fatalf("modules/recovery/variables.tf does not carry the %s input", name)
@@ -1034,9 +1074,11 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		`run "rejects_an_invalid_request_duration"`,
 		`run "rejects_an_empty_approver_set"`,
 		`run "rejects_a_malformed_approver_principal"`,
+		`run "rejects_a_non_numeric_organization_number"`,
 		"expect_failures = [var.entitlement_id]",
 		"expect_failures = [var.max_request_duration]",
 		"expect_failures = [var.approvers]",
+		"expect_failures = [var.organization_number]",
 	} {
 		if !strings.Contains(moduleFixture, required) {
 			t.Fatalf("modules/recovery/variables.tofutest.hcl does not carry the proof element %q", required)
@@ -1044,7 +1086,7 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 	}
 
 	moduleReadme := readRepositoryFile(t, filepath.Join("modules", "recovery", "README.md"))
-	for _, required := range []string{"privileged-access entitlement", "max_request_duration", "approvers", "never a standing grant", "drill"} {
+	for _, required := range []string{"privileged-access entitlement", "max_request_duration", "approvers", "never a standing grant", "drill", "organization_number", "Privileged Access Manager service agent"} {
 		if !strings.Contains(moduleReadme, required) {
 			t.Fatalf("the recovery module README does not document %q of the entitlement form", required)
 		}
@@ -1115,6 +1157,9 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 		"never a standing grant",
 		"approval- and justification-bound",
 		"platform-enforced grant duration",
+		"organization plane",
+		"organization_number",
+		"roles/privilegedaccessmanager.projectServiceAgent",
 	} {
 		if !strings.Contains(adr, required) {
 			t.Fatalf("ADR-0001 does not carry the evolved recovery decision element %q", required)
@@ -1124,6 +1169,7 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 	// The operations runbook carries the activation and drill form.
 	runbook := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "operations", "break-glass-recovery-activation.md")))
 	for _, required := range []string{
+		"gcloud pam check-onboarding-status",
 		"gcloud pam grants create",
 		"--requested-duration",
 		"--justification",
@@ -1137,6 +1183,9 @@ func TestEveryStackDeclaresTheBreakGlassRecovery(t *testing.T) {
 	}
 
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-35") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-35")
+	}
 	if !strings.Contains(traceability, "DAI-34") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-34")
 	}

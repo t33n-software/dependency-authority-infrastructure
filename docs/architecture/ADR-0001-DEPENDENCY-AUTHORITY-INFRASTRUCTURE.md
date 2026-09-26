@@ -309,7 +309,16 @@ infrastructure core.
      complete by the packaging contract guard, which maps every declared
      resource class to its covering administrative role and fails closed
      while any class is uncovered, so a growing declaration forces the set
-     to grow with it; the set never carries a legacy basic role. Every
+     to grow with it; the set never carries a legacy basic role. The set carries only
+     project-grantable roles: a declared class whose covering capability lives
+     above the project level is proven covered by the organization plane and is
+     never forced into the zone set — the organization policies of the
+     policy-bindings module are administered by the organization plane, because
+     their covering role is grantable only at organization level (proven
+     non-grantable in a project-scoped entitlement by the live apply
+     rejection), so their recovery escalates to the organization-plane recovery
+     surface, and the packaging contract guard carries the named org-plane
+     exception class fail-closed. Every
      activation is approval- and justification-bound and time-boxed per
      activation through the platform-enforced grant duration
      (`max_request_duration`), and the grant auto-expires at the end of the
@@ -337,7 +346,17 @@ infrastructure core.
      (docs/operations/break-glass-recovery-activation.md) activates the
      entitlement, proves the elevated capability and lets the grant expire —
      a reviewed operational event whose evidence lands in the evidence
-     plane. The behavioral rejection proofs of the binding live beside
+     plane. The module also declares the standing platform setup of the
+     privileged-access surface: the organization-level Privileged Access
+     Manager service agent — derived from the instance-bound
+     organization_number input of every zone stack, never a stack default and
+     never a module default — holds
+     roles/privilegedaccessmanager.projectServiceAgent on the zone project,
+     engine-managed, never a window grant and never a recovery capability of
+     the break-glass identity; the API activation and the agent's existence
+     precede the apply through the governed operator channel, because the
+     instance declares the API in the zone's capability floor. The
+     behavioral rejection proofs of the binding live beside
      every stack, and the module fixture proves the input validations
      offline.
  16. Every managed resource of the declaration plane declares the canonical

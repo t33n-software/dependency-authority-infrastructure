@@ -13,9 +13,10 @@
 # file, and every value assigned here is synthetic test data.
 
 variables {
-  project_id     = "test-dep-control"
-  project_number = "100000000010"
-  location       = "europe-west1"
+  project_id          = "test-dep-control"
+  project_number      = "100000000010"
+  organization_number = "900000000001"
+  location            = "europe-west1"
 
   workload_network = {
     network_name               = "dep-control-workload"
@@ -590,4 +591,31 @@ run "rejects_a_non_numeric_project_number" {
   }
 
   expect_failures = [var.project_number]
+}
+
+run "accepts_a_numeric_organization_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.organization_number == "900000000001"
+    error_message = "The validation must accept the numeric Google Cloud organization number."
+  }
+}
+
+run "rejects_a_non_numeric_organization_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    organization_number = "test-dep-control"
+  }
+
+  expect_failures = [var.organization_number]
 }
