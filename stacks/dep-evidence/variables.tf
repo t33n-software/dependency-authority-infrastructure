@@ -31,22 +31,43 @@ variable "location" {
 variable "workload_network" {
   description = <<-EOT
     The zone workload network origin binding: the VPC network name, the
-    subnetwork name and the subnetwork CIDR of the zone VPC. The stack
-    declares exactly one VPC with one subnetwork in the job region (the stack
-    location) carrying Private Google Access, the restricted-range DNS
-    response policy and the egress firewall pair; the zone's workload jobs
-    attach to it with Direct VPC egress and all-traffic routing. All values
-    are instance-supplied.
+    subnetwork name, the subnetwork CIDR and the canonical description of
+    every managed surface of the zone VPC. The stack declares exactly one VPC
+    with one subnetwork in the job region (the stack location) carrying
+    Private Google Access, the restricted-range DNS response policy and the
+    egress firewall pair; the zone's workload jobs attach to it with Direct
+    VPC egress and all-traffic routing. The mandatory description duty of the
+    mandatory resource properties convention binds the description surfaces:
+    the VPC and subnetwork descriptions are create-only surfaces, bound
+    byte-exact to the live values at the convergence window; the egress
+    firewall pair and the restricted-range DNS response policy descriptions
+    are in-place surfaces. All values are instance-supplied.
   EOT
   type = object({
-    network_name = string
-    subnet_name  = string
-    subnet_cidr  = string
+    network_name               = string
+    subnet_name                = string
+    subnet_cidr                = string
+    network_description        = string
+    subnet_description         = string
+    firewall_allow_description = string
+    firewall_deny_description  = string
+    dns_policy_description     = string
   })
 
   validation {
     condition     = can(cidrhost(var.workload_network.subnet_cidr, 0))
     error_message = "workload_network.subnet_cidr must be a valid CIDR range."
+  }
+
+  validation {
+    condition = (
+      length(var.workload_network.network_description) > 0 &&
+      length(var.workload_network.subnet_description) > 0 &&
+      length(var.workload_network.firewall_allow_description) > 0 &&
+      length(var.workload_network.firewall_deny_description) > 0 &&
+      length(var.workload_network.dns_policy_description) > 0
+    )
+    error_message = "workload_network must bind the non-empty canonical description of every managed network surface: the create-only VPC and subnetwork descriptions byte-exact to the live values, and the in-place firewall pair and DNS policy descriptions."
   }
 }
 
