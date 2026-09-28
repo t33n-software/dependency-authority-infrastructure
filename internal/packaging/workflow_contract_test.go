@@ -2666,12 +2666,114 @@ func TestEvidenceStackBindsTheMandatoryDescriptionSurfaces(t *testing.T) {
 	}
 }
 
+func TestIntakeStackBindsTheMandatoryDescriptionSurfaces(t *testing.T) {
+	// The mandatory description duty of the mandatory resource properties
+	// convention extends to the intake zone: the intake stack binds the five
+	// description surfaces of the workload network origin as required
+	// instance-supplied values — never optional, never a stack default — with
+	// the non-empty validation bound fail-closed, binds the fetcher identity's
+	// display name and description in the same required form and wires the
+	// pool and audit sink description surfaces. The module surface and its
+	// wirings stay bound by the control-zone guard; this guard binds the
+	// intake-stack binding.
+	intakeVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "variables.tf")))
+	networkSegment := segmentFromMarker(t, intakeVariables, `variable "workload_network" {`, ` variable "`, "stacks/dep-intake/variables.tf")
+	for _, required := range []string{
+		`network_description = string`,
+		`subnet_description = string`,
+		`firewall_allow_description = string`,
+		`firewall_deny_description = string`,
+		`dns_policy_description = string`,
+		`length(var.workload_network.network_description) > 0`,
+		`length(var.workload_network.subnet_description) > 0`,
+		`length(var.workload_network.firewall_allow_description) > 0`,
+		`length(var.workload_network.firewall_deny_description) > 0`,
+		`length(var.workload_network.dns_policy_description) > 0`,
+	} {
+		if !strings.Contains(networkSegment, required) {
+			t.Fatalf("stacks/dep-intake/variables.tf does not bind the mandatory description surface element %q", required)
+		}
+	}
+	if strings.Contains(networkSegment, "optional(") {
+		t.Fatal("stacks/dep-intake/variables.tf carries an optional description surface of the workload network origin; the intake zone binds every surface as a required instance-supplied value")
+	}
+
+	// The fetcher identity binds its display name and description as required
+	// instance-supplied values — the control-zone controller form projected
+	// onto the single lane identity of the intake zone.
+	fetcherSegment := segmentFromMarker(t, intakeVariables, `variable "fetcher" {`, ` variable "`, "stacks/dep-intake/variables.tf")
+	for _, required := range []string{
+		`display_name = string`,
+		`description = string`,
+		`length(var.fetcher.display_name) > 0 && length(var.fetcher.description) > 0`,
+	} {
+		if !strings.Contains(fetcherSegment, required) {
+			t.Fatalf("stacks/dep-intake/variables.tf does not bind the fetcher description surface element %q", required)
+		}
+	}
+	if strings.Contains(fetcherSegment, `display_name = optional(`) || strings.Contains(fetcherSegment, `description = optional(`) {
+		t.Fatal("stacks/dep-intake/variables.tf carries an optional fetcher display or description surface; the fetcher identity binds both as required values")
+	}
+
+	// The intake stack wires the pool and audit sink description surfaces.
+	intakeMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "main.tf")))
+	for _, required := range []string{
+		`pool_display_name = var.pool_id`,
+		`pool_description = local.workload_identity_pool_description`,
+		`description = local.audit_sink_description`,
+	} {
+		if !strings.Contains(intakeMain, required) {
+			t.Fatalf("stacks/dep-intake/main.tf does not wire the description surface %q", required)
+		}
+	}
+
+	// The behavioral proofs of the stack bindings live beside the code.
+	fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`network_description = "Zone workload network origin."`,
+		`run "accepts_the_description_surface_bindings"`,
+		`run "rejects_an_empty_network_description"`,
+		`run "rejects_an_identity_without_the_description_surfaces"`,
+		`expect_failures = [var.fetcher]`,
+	} {
+		if !strings.Contains(fixture, required) {
+			t.Fatalf("stacks/dep-intake/variables.tofutest.hcl does not carry the description duty proof element %q", required)
+		}
+	}
+
+	// The documentation surfaces carry the duty: the stack README, the
+	// architecture decision record and the register.
+	stackReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "README.md"))
+	for _, required := range []string{"mandatory resource properties convention", "byte-exact", "display name and description"} {
+		if !strings.Contains(stackReadme, required) {
+			t.Fatalf("the dep-intake stack README does not document %q of the mandatory description duty", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"intake stack binds",
+		"create-only",
+		"byte-exact",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the intake description duty element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-39") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-39")
+	}
+}
+
 func TestControlStackBindsTheWorkloadJobEnvOwnership(t *testing.T) {
 	// The workload configuration ownership convention: the declaration owns
 	// every static, non-credential configuration value of a workload
 	// completely. The control stack consumes the instance-bound
 	// workload_job_env input — never a stack default — and wires it into the
-	// job module; every other stack is pure.
+	// job module; the intake stack binds the same surface for its fetch job
+	// (DAI-39), and the remaining stacks stay pure.
 	controlVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-control", "variables.tf")))
 	start := strings.Index(controlVariables, `variable "workload_job_env" {`)
 	if start < 0 {
@@ -2701,15 +2803,19 @@ func TestControlStackBindsTheWorkloadJobEnvOwnership(t *testing.T) {
 		t.Fatal("stacks/dep-control/main.tf does not wire the instance-bound env binding into the workload jobs")
 	}
 
-	// Zone purity: no other stack ever carries the binding.
-	for _, stack := range []string{"dep-intake", "dep-evidence", "dep-approved", "dep-quarantine"} {
+	// Zone purity: the binding lives exactly in the zones whose workloads carry
+	// the proven static environment surface (dep-control and dep-intake); the
+	// remaining stacks never carry it — the evidence zone's jobs stay planned
+	// without a proven live surface, and the approved and quarantine zones own
+	// no jobs.
+	for _, stack := range []string{"dep-evidence", "dep-approved", "dep-quarantine"} {
 		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
 		if strings.Contains(main, "workload_job_env") {
-			t.Fatalf("stacks/%s must never bind the workload job env surface; it lives exactly once in dep-control", stack)
+			t.Fatalf("stacks/%s must never bind the workload job env surface before its workloads carry a proven static environment surface; the binding lives in dep-control and dep-intake", stack)
 		}
 		variables := readRepositoryFile(t, filepath.Join("stacks", stack, "variables.tf"))
 		if strings.Contains(variables, "workload_job_env") {
-			t.Fatalf("stacks/%s/variables.tf must never carry the workload_job_env binding; it lives exactly once in dep-control", stack)
+			t.Fatalf("stacks/%s/variables.tf must never carry the workload_job_env binding before its workloads carry a proven static environment surface; the binding lives in dep-control and dep-intake", stack)
 		}
 	}
 
@@ -2750,6 +2856,74 @@ func TestControlStackBindsTheWorkloadJobEnvOwnership(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-28") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-28")
+	}
+}
+
+func TestIntakeStackBindsTheWorkloadJobEnvOwnership(t *testing.T) {
+	// The workload configuration ownership convention extends to the intake
+	// zone: the intake fetch job carries the proven static environment
+	// bindings at its convergence window, so the intake stack consumes the
+	// instance-bound workload_job_env input — never a stack default — and
+	// wires it into the job module.
+	intakeVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "variables.tf")))
+	segment := segmentFromMarker(t, intakeVariables, `variable "workload_job_env" {`, ` variable "`, "stacks/dep-intake/variables.tf")
+	if strings.Contains(segment, "default") {
+		t.Fatal("stacks/dep-intake/variables.tf carries a default for workload_job_env; the static configuration is an instance binding, never a stack default")
+	}
+	for _, required := range []string{
+		`type = map(map(string))`,
+		`length(setsubtract(keys(var.workload_job_env), keys(local.workload_jobs))) == 0`,
+		`can(regex("^[A-Z][A-Z0-9_]*$", key))`,
+		`!can(regex("(?i)(password|secret|token|credential|api[_-]?key|private[_-]?key)", key))`,
+		`!can(regex("(?i)(password|secret|token|credential|api[_-]?key|private[_-]?key)", value))`,
+	} {
+		if !strings.Contains(segment, required) {
+			t.Fatalf("stacks/dep-intake/variables.tf does not bind the workload job env ownership element %q", required)
+		}
+	}
+
+	intakeMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "main.tf")))
+	if !strings.Contains(intakeMain, `env = lookup(var.workload_job_env, each.key, {})`) {
+		t.Fatal("stacks/dep-intake/main.tf does not wire the instance-bound env binding into the workload jobs")
+	}
+
+	// The behavioral proofs live beside the stack.
+	fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`workload_job_env = {`,
+		`run "accepts_the_canonical_workload_job_env_binding"`,
+		`run "rejects_an_unknown_job_env_binding"`,
+		`run "rejects_a_credential_carrying_env_binding"`,
+		`expect_failures = [var.workload_job_env]`,
+	} {
+		if !strings.Contains(fixture, required) {
+			t.Fatalf("stacks/dep-intake/variables.tofutest.hcl does not carry the workload job env proof element %q", required)
+		}
+	}
+
+	// The documentation surfaces carry the ownership form: the stack README,
+	// the architecture decision record and the register.
+	stackReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-intake", "README.md"))
+	for _, required := range []string{"workload_job_env", "configuration ownership", "never a stack default"} {
+		if !strings.Contains(stackReadme, required) {
+			t.Fatalf("the dep-intake stack README does not document %q of the workload job env ownership", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"intake stack consumes the same instance-bound",
+		"workload_job_env",
+		"never a stack default",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the intake workload job env ownership element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-39") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-39")
 	}
 }
 
