@@ -1,6 +1,7 @@
 # The behavioral proofs of the dep-evidence root: the corrected
 # state_bucket_name validation, the instance-bound project number binding,
-# the workload-job activation gate and the recovery binding — the acceptance
+# the workload-job activation gate, the recovery binding and the workload
+# network description duty — the acceptance
 # paths through assertions and the rejection paths through expect_failures —
 # every run is a plan with refresh disabled, and no run creates
 # infrastructure.
@@ -19,9 +20,14 @@ variables {
   location            = "europe-west1"
 
   workload_network = {
-    network_name = "dep-evidence-workload"
-    subnet_name  = "dep-evidence-workload-europe-west1"
-    subnet_cidr  = "10.30.0.0/26"
+    network_name               = "dep-evidence-workload"
+    subnet_name                = "dep-evidence-workload-europe-west1"
+    subnet_cidr                = "10.30.0.0/26"
+    network_description        = "Zone workload network origin."
+    subnet_description         = "Zone workload subnetwork."
+    firewall_allow_description = "Allow egress TCP 443 to the restricted range."
+    firewall_deny_description  = "Deny all remaining egress."
+    dns_policy_description     = "Restricted-range DNS form."
   }
 
   writer = {
@@ -188,6 +194,42 @@ run "rejects_an_empty_recovery_approver_set" {
   }
 
   expect_failures = [var.break_glass_recovery]
+}
+
+run "accepts_the_description_surface_bindings" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.workload_network.network_description == "Zone workload network origin."
+    error_message = "The workload network origin must bind the canonical description surface."
+  }
+}
+
+run "rejects_an_empty_network_description" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    workload_network = {
+      network_name               = "dep-evidence-workload"
+      subnet_name                = "dep-evidence-workload-europe-west1"
+      subnet_cidr                = "10.30.0.0/26"
+      network_description        = ""
+      subnet_description         = "Zone workload subnetwork."
+      firewall_allow_description = "Allow egress TCP 443 to the restricted range."
+      firewall_deny_description  = "Deny all remaining egress."
+      dns_policy_description     = "Restricted-range DNS form."
+    }
+  }
+
+  expect_failures = [var.workload_network]
 }
 
 run "accepts_a_numeric_project_number" {

@@ -85,7 +85,11 @@ workload jobs: exactly the bound jobs plus the jobs being provisioned in the
 current window), `break_glass_recovery` (the approved recovery binding of the
 evidence zone: the per-activation grant duration of the recovery entitlement
 and the approver principal set of its approval workflow), `workload_network` (the instance-bound zone VPC names and
-CIDR), `archive_bucket_name`,
+CIDR plus the canonical description of every managed network surface — the
+mandatory description duty of the mandatory resource properties convention:
+the create-only VPC and subnetwork descriptions bound byte-exact to the live
+values at the convergence window, the in-place firewall pair and DNS policy
+descriptions as the canonical forms), `archive_bucket_name`,
 `retention_period_seconds`, `lock_retention_policy`,
 optional `archive_kms_key_name`, the matrix-bound `additional_writer_members`
 and `additional_auditor_members`, `forensics_group` (the instance-bound

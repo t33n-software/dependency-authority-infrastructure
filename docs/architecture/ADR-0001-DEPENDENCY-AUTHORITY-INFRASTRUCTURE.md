@@ -373,7 +373,13 @@ infrastructure core.
      convergence window (a missing or diverging declaration there forces
      recreation and is a blocking defect, never a cosmetic drift), the
      in-place surfaces as the canonical forms normalized through the reviewed
-     plan-gated change. The workload-identity module binds the trigger
+     plan-gated change. The evidence stack binds the five description surfaces
+     of its workload network origin in the same required, fail-closed form —
+     the create-only VPC and subnetwork descriptions byte-exact to the live
+     values of the evidence zone at its convergence window, the in-place
+     surfaces as the canonical forms — because the evidence zone carries the
+     same workload network origin and its convergence window faces the same
+     recreation hazard on a diverging declaration. The workload-identity module binds the trigger
      identity display name to its identity class name, and the control stack
      binds the pool display and description surfaces, the audit sink
      description and the per-controller display name and description —

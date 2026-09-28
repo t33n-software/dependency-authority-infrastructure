@@ -2590,6 +2590,82 @@ func TestControlStackBindsTheMandatoryDescriptionSurfaces(t *testing.T) {
 	}
 }
 
+func TestEvidenceStackBindsTheMandatoryDescriptionSurfaces(t *testing.T) {
+	// The mandatory description duty of the mandatory resource properties
+	// convention extends to the evidence zone: the evidence stack binds the
+	// five description surfaces of the workload network origin as required
+	// instance-supplied values — never optional, never a stack default — with
+	// the non-empty validation bound fail-closed. The module surface and its
+	// wirings stay bound by the control-zone guard; this guard binds the
+	// evidence-stack binding.
+	evidenceVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "variables.tf")))
+	start := strings.Index(evidenceVariables, `variable "workload_network" {`)
+	if start < 0 {
+		t.Fatal("stacks/dep-evidence/variables.tf does not carry the workload_network input")
+	}
+	segment := evidenceVariables[start:]
+	if next := strings.Index(segment, ` variable "`); next > 0 {
+		segment = segment[:next]
+	}
+	for _, required := range []string{
+		`network_description = string`,
+		`subnet_description = string`,
+		`firewall_allow_description = string`,
+		`firewall_deny_description = string`,
+		`dns_policy_description = string`,
+		`length(var.workload_network.network_description) > 0`,
+		`length(var.workload_network.subnet_description) > 0`,
+		`length(var.workload_network.firewall_allow_description) > 0`,
+		`length(var.workload_network.firewall_deny_description) > 0`,
+		`length(var.workload_network.dns_policy_description) > 0`,
+	} {
+		if !strings.Contains(segment, required) {
+			t.Fatalf("stacks/dep-evidence/variables.tf does not bind the mandatory description surface element %q", required)
+		}
+	}
+	if strings.Contains(segment, "optional(") {
+		t.Fatal("stacks/dep-evidence/variables.tf carries an optional description surface of the workload network origin; the evidence zone binds every surface as a required instance-supplied value")
+	}
+
+	// The behavioral proofs of the stack bindings live beside the code.
+	fixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`network_description = "Zone workload network origin."`,
+		`run "accepts_the_description_surface_bindings"`,
+		`run "rejects_an_empty_network_description"`,
+		`expect_failures = [var.workload_network]`,
+	} {
+		if !strings.Contains(fixture, required) {
+			t.Fatalf("stacks/dep-evidence/variables.tofutest.hcl does not carry the description duty proof element %q", required)
+		}
+	}
+
+	// The documentation surfaces carry the duty: the stack README, the
+	// architecture decision record and the register.
+	stackReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "README.md"))
+	for _, required := range []string{"mandatory resource properties convention", "byte-exact", "description"} {
+		if !strings.Contains(stackReadme, required) {
+			t.Fatalf("the dep-evidence stack README does not document %q of the mandatory description duty", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"evidence stack binds",
+		"create-only",
+		"byte-exact",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the evidence description duty element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-38") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-38")
+	}
+}
+
 func TestControlStackBindsTheWorkloadJobEnvOwnership(t *testing.T) {
 	// The workload configuration ownership convention: the declaration owns
 	// every static, non-credential configuration value of a workload
