@@ -88,5 +88,5 @@ disclosed vulnerabilities fail closed even without source changes.
 Governed changes land through ticket branches and pull requests into
 `develop`. `main` is the production and control-plane truth. Branch
 governance is bound through the organization-level rule-sets; see
-`docs/conventions/hosting-plattform/github/rule-sets/` for the canonical
+`docs/conventions/hosting-platforms/github/rule-sets/` for the canonical
 source and the rule-set family of this repository.

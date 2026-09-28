@@ -379,10 +379,19 @@ infrastructure core.
      values of the evidence zone at its convergence window, the in-place
      surfaces as the canonical forms — because the evidence zone carries the
      same workload network origin and its convergence window faces the same
-     recreation hazard on a diverging declaration. The workload-identity module binds the trigger
+     recreation hazard on a diverging declaration. The intake stack binds the
+     five description surfaces of its workload network origin in the same
+     required, fail-closed form — the create-only VPC and subnetwork
+     descriptions byte-exact to the live values of the intake zone at its
+     convergence window, the in-place surfaces as the canonical forms —
+     because the intake zone carries the same workload network origin and its
+     convergence window faces the same recreation hazard on a diverging
+     declaration. The workload-identity module binds the trigger
      identity display name to its identity class name, and the control stack
      binds the pool display and description surfaces, the audit sink
-     description and the per-controller display name and description —
+     description and the per-controller display name and description, and the
+     intake stack binds the pool display and description surfaces, the audit
+     sink description and the fetcher display name and description —
      required and validated fail-closed. The forbidden escape forms of the
      convention stay forbidden: no `lifecycle ignore_changes` on a mandatory
      property, and no computed description form on a create-only surface. The
@@ -398,6 +407,10 @@ infrastructure core.
      module (`env = lookup(var.workload_job_env, each.key, {})`), so a value
      the declaration does not carry is a declaration gap the plan surfaces
      and a window never applies over an unreviewed configuration diff. The
+     intake stack consumes the same instance-bound input in the same
+     fail-closed form and wires it into its fetch job, because the intake
+     fetch job carries the proven static environment bindings at its
+     convergence window. The
      binding is fail-closed: the input references only declared jobs of the
      zone topology, every key is a well-formed environment name, and no key
      or value ever carries a credential marker (the workload internal

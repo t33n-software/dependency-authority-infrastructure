@@ -42,6 +42,15 @@ remote repositories' configured upstreams; never a perimeter egress rule).
   set always carries every bound job (a bound job dropped from the active set
   would plan its own destruction), and the declaration binds the consistency
   fail-closed.
+- The declaration owns the static, non-credential configuration of the
+  zone's workload job completely (the workload configuration ownership
+  convention): the stack consumes the instance-bound `workload_job_env`
+  input — the proven static environment bindings of the job, keyed by the
+  canonical job name — never a stack default. Every value referencing another
+  bound surface is a proven projection the instance verifier cross-binds
+  fail-closed against its canonical source. Operation inputs travel as
+  validated execution parameters of the invocation, never as baked-in values,
+  and credentials never travel this surface.
 - The workload job attaches to the zone VPC declared by this stack and routes
   all outgoing traffic through it (Direct VPC egress, all-traffic): the
   workload network origin is part of the execution contract, and the stack
@@ -49,6 +58,16 @@ remote repositories' configured upstreams; never a perimeter egress rule).
   (`run.allowedVPCEgress` allows only all-traffic, `run.allowedIngress`
   allows only internal). A job without the zone network attachment presents
   no in-perimeter network origin and fails closed at the perimeter.
+- Every managed surface of the zone workload network origin binds its
+  canonical human-readable description (the mandatory description duty of the
+  mandatory resource properties convention): the VPC and subnetwork
+  descriptions are create-only surfaces bound byte-exact to the live values
+  at the convergence window, and the firewall pair and DNS response policy
+  descriptions are in-place surfaces — all bound through the required
+  `workload_network` input fields, never stack defaults. The zone workload
+  identity pool and the audit sink carry their canonical intent descriptions,
+  and the fetcher identity binds its display name and description as
+  instance-bound values.
 - The lane federates to the dedicated invoke-only trigger identity of the
   job, never to the execution identity; the trigger identity holds invoke on
   exactly `dep-intake-fetch` and no data-plane grant.
@@ -82,15 +101,23 @@ remote repositories' configured upstreams; never a perimeter egress rule).
 ## Inputs
 
 `project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `organization_number` (the instance-bound numeric organization number carried by the zone's privileged-access platform setup), `location`, `ecosystems` (default `["go"]`), `pool_id`,
-`fetcher` (OIDC bindings of the intake fetcher), `additional_reader_members`
+`fetcher` (the OIDC bindings and the canonical display name and description
+surfaces of the intake fetcher identity), `additional_reader_members`
 (the matrix-bound control-plane readers), `workload_job_images`
 (the instance-bound image digests keyed by canonical job name),
+`workload_job_env` (the instance-bound static environment bindings of the
+zone's workload job, keyed by the canonical job name — the declaration owns
+every static, non-credential configuration value completely; credentials
+never travel this surface),
 `enabled_workload_jobs` (the instance-bound activation set of the zone's
 workload jobs: exactly the bound jobs plus the jobs being provisioned in the
 current window), `break_glass_recovery` (the approved recovery binding of the
 intake zone: the per-activation grant duration of the recovery entitlement
 and the approver principal set of its approval workflow), `workload_network` (the instance-bound zone VPC names and
-CIDR),
+CIDR plus the canonical description surfaces of every managed network
+surface: the create-only VPC and subnetwork descriptions bound byte-exact to
+the live values, the in-place firewall pair and DNS response policy
+descriptions),
 `forensics_group` (the instance-bound forensics reader group),
 `evidence_bucket_name`, `state_bucket_name` (the instance-bound zone state
 home bucket, provisioned by the converged foundation — never by this stack),

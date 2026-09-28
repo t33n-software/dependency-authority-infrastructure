@@ -22,6 +22,13 @@ locals {
       trigger_id   = "dep-intake-fetch-trigger"
     }
   }
+
+  # The canonical human-readable description surfaces of the zone identity and
+  # audit export boundaries (the mandatory description duty of the mandatory
+  # resource properties convention): the canonical intent texts of the zone
+  # workload identity pool and the zone audit sink.
+  workload_identity_pool_description = "Workload identity pool of the intake zone: federates exactly the lane trigger identities of the zone, never the execution identities."
+  audit_sink_description             = "Zone audit export: exports the zone project's Cloud Audit Logs into the evidence archive bucket of the evidence zone."
 }
 
 provider "google" {
@@ -92,6 +99,12 @@ module "workload_identity" {
   project_number = var.project_number
   pool_id        = var.pool_id
 
+  # The canonical human-readable surfaces of the zone pool (the mandatory
+  # description duty): the display name binds the pool's identity class name,
+  # the description the canonical intent text.
+  pool_display_name = var.pool_id
+  pool_description  = local.workload_identity_pool_description
+
   identities = {
     fetcher = merge(var.fetcher, {
       trigger_service_account_id = local.workload_jobs["dep-intake-fetch"].trigger_id
@@ -127,6 +140,13 @@ module "workload_jobs" {
   network               = module.network.workload_network_id
   subnetwork            = module.network.workload_subnetwork_id
 
+  # The declaration owns the static, non-credential configuration of every
+  # workload job completely (the workload configuration ownership
+  # convention): the organization instance binds the proven values as
+  # reviewed configuration, operation inputs travel as validated execution
+  # parameters of the invocation, and credentials never travel this surface.
+  env = lookup(var.workload_job_env, each.key, {})
+
   labels = {
     boundary = "dependency-authority"
     zone     = "intake"
@@ -140,7 +160,8 @@ module "audit_log_sink" {
 
   sinks = {
     (var.audit_sink_name) = {
-      filter = var.audit_log_filter
+      filter      = var.audit_log_filter
+      description = local.audit_sink_description
     }
   }
 }

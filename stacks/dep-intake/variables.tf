@@ -31,22 +31,43 @@ variable "location" {
 variable "workload_network" {
   description = <<-EOT
     The zone workload network origin binding: the VPC network name, the
-    subnetwork name and the subnetwork CIDR of the zone VPC. The stack
-    declares exactly one VPC with one subnetwork in the job region (the stack
-    location) carrying Private Google Access, the restricted-range DNS
-    response policy and the egress firewall pair; the zone's workload job
-    attaches to it with Direct VPC egress and all-traffic routing. All values
-    are instance-supplied.
+    subnetwork name, the subnetwork CIDR and the canonical description of
+    every managed surface of the zone VPC. The stack declares exactly one VPC
+    with one subnetwork in the job region (the stack location) carrying
+    Private Google Access, the restricted-range DNS response policy and the
+    egress firewall pair; the zone's workload job attaches to it with Direct
+    VPC egress and all-traffic routing. The mandatory description duty of the
+    mandatory resource properties convention binds the description surfaces:
+    the VPC and subnetwork descriptions are create-only surfaces, bound
+    byte-exact to the live values at the convergence window; the egress
+    firewall pair and the restricted-range DNS response policy descriptions
+    are in-place surfaces. All values are instance-supplied.
   EOT
   type = object({
-    network_name = string
-    subnet_name  = string
-    subnet_cidr  = string
+    network_name               = string
+    subnet_name                = string
+    subnet_cidr                = string
+    network_description        = string
+    subnet_description         = string
+    firewall_allow_description = string
+    firewall_deny_description  = string
+    dns_policy_description     = string
   })
 
   validation {
     condition     = can(cidrhost(var.workload_network.subnet_cidr, 0))
     error_message = "workload_network.subnet_cidr must be a valid CIDR range."
+  }
+
+  validation {
+    condition = (
+      length(var.workload_network.network_description) > 0 &&
+      length(var.workload_network.subnet_description) > 0 &&
+      length(var.workload_network.firewall_allow_description) > 0 &&
+      length(var.workload_network.firewall_deny_description) > 0 &&
+      length(var.workload_network.dns_policy_description) > 0
+    )
+    error_message = "workload_network must bind the non-empty canonical description of every managed network surface: the create-only VPC and subnetwork descriptions byte-exact to the live values, and the in-place firewall pair and DNS policy descriptions."
   }
 }
 
@@ -77,16 +98,26 @@ variable "fetcher" {
     Workload identity binding of the intake fetcher (canonical identity class
     dep-intake-fetcher). The organization instance binds the exact repository,
     protected workflow reference, environment and audience through
-    attribute_condition and principal_value.
+    attribute_condition and principal_value, and binds the canonical display
+    name and description surfaces of the identity (the mandatory description
+    duty of the mandatory resource properties convention) as instance-bound
+    values.
   EOT
   type = object({
     provider_id         = string
     service_account_id  = optional(string, "dep-intake-fetcher")
+    display_name        = string
+    description         = string
     attribute_condition = string
     principal_attribute = optional(string, "repository")
     principal_value     = string
     roles               = optional(set(string), [])
   })
+
+  validation {
+    condition     = length(var.fetcher.display_name) > 0 && length(var.fetcher.description) > 0
+    error_message = "the fetcher identity must bind its non-empty canonical display name and description surfaces (the mandatory description duty of the mandatory resource properties convention)."
+  }
 }
 
 variable "additional_reader_members" {
@@ -216,5 +247,46 @@ variable "break_glass_recovery" {
       && alltrue([for principal in var.break_glass_recovery.approvers : can(regex("^(user|group|serviceAccount):[^\\s]+$", principal))])
     )
     error_message = "break_glass_recovery.approvers must carry at least one approver principal in the user:, group: or serviceAccount: form; every activation is approval-bound."
+  }
+}
+
+variable "workload_job_env" {
+  description = <<-EOT
+    The instance-bound static environment bindings of the zone's workload
+    jobs, keyed by the canonical job name. The declaration owns every static,
+    non-credential configuration value of a workload completely (the workload
+    configuration ownership convention): the organization instance binds the
+    proven live values as reviewed configuration, and every value referencing
+    another bound surface is a proven projection the instance verifier
+    cross-binds fail-closed against its canonical source. Operation inputs
+    travel as validated execution parameters of the invocation, never as
+    baked-in values, and credentials never travel this surface. The core
+    never presets it.
+  EOT
+  type        = map(map(string))
+
+  validation {
+    condition     = length(setsubtract(keys(var.workload_job_env), keys(local.workload_jobs))) == 0
+    error_message = "workload_job_env must reference only declared workload jobs of the zone topology."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, bindings in var.workload_job_env :
+      alltrue([for key in keys(bindings) : can(regex("^[A-Z][A-Z0-9_]*$", key))])
+    ])
+    error_message = "workload_job_env must carry only well-formed environment variable names (UPPER_SNAKE_CASE)."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, bindings in var.workload_job_env :
+      alltrue([
+        for key, value in bindings :
+        !can(regex("(?i)(password|secret|token|credential|api[_-]?key|private[_-]?key)", key))
+        && !can(regex("(?i)(password|secret|token|credential|api[_-]?key|private[_-]?key)", value))
+      ])
+    ])
+    error_message = "workload_job_env never carries credentials: no key and no value may carry a credential marker."
   }
 }
