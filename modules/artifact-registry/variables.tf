@@ -48,15 +48,20 @@ variable "mode" {
 variable "remote_upstream" {
   description = <<-EOT
     Remote upstream binding, required exactly once for REMOTE_REPOSITORY mode and
-    forbidden otherwise. Exactly one field must be set:
+    forbidden otherwise. Exactly one upstream field must be set:
     - npm: public upstream enum (only NPMJS)
     - python: public upstream enum (only PYPI)
     - common_uri: common upstream URI (Go remote intake uses https://proxy.golang.org)
+    The optional description is an instance-bound surface (null or non-empty,
+    never a core-carried text): it forces replacement of the repository, so a
+    repository born before the declaration binds the absent form byte-exact to
+    the live state.
   EOT
   type = object({
-    npm        = optional(string)
-    python     = optional(string)
-    common_uri = optional(string)
+    npm         = optional(string)
+    python      = optional(string)
+    common_uri  = optional(string)
+    description = optional(string)
   })
   default = null
 
@@ -66,8 +71,13 @@ variable "remote_upstream" {
   }
 
   validation {
-    condition     = var.remote_upstream == null || length(compact([for _, value in var.remote_upstream : value])) == 1
+    condition     = var.remote_upstream == null || length(compact([var.remote_upstream.npm, var.remote_upstream.python, var.remote_upstream.common_uri])) == 1
     error_message = "remote_upstream must set exactly one of npm, python or common_uri."
+  }
+
+  validation {
+    condition     = var.remote_upstream == null || var.remote_upstream.description == null || length(var.remote_upstream.description) > 0
+    error_message = "remote_upstream.description must be null or non-empty: the absent form is the byte-exact binding of a repository born before the declaration."
   }
 
   validation {

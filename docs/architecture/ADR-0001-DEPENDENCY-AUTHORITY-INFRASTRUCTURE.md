@@ -392,9 +392,15 @@ infrastructure core.
      description and the per-controller display name and description, and the
      intake stack binds the pool display and description surfaces, the audit
      sink description and the fetcher display name and description —
-     required and validated fail-closed. The forbidden escape forms of the
-     convention stay forbidden: no `lifecycle ignore_changes` on a mandatory
-     property, and no computed description form on a create-only surface. The
+      required and validated fail-closed. The artifact-registry module's
+      remote configuration description is an optional instance-bound surface
+      (null or non-empty), never a core-carried text: the field forces
+      replacement of the repository, so a repository born before the
+      declaration binds the absent form byte-exact to the live state, and a
+      repository born through the engine may carry the canonical text from
+      birth. The forbidden escape forms of the
+      convention stay forbidden: no `lifecycle ignore_changes` on a mandatory
+      property, and no computed description form on a create-only surface. The
       behavioral proofs live beside the code: the module fixture proves the
       binding offline, and the stack fixture proves the fail-closed form in
       the governed execution window.

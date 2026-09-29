@@ -11,7 +11,13 @@ GENERIC evidence repositories and DOCKER workload image repositories
   registry bindings; every concrete value is an instance-supplied variable.
 - Remote intake for Go maps to `common_repository.uri = "https://proxy.golang.org"`:
   the Artifact Registry remote-source union has no Go-specific field, and the
-  `gcloud --remote-go-repo` flag maps to the same common repository URI.
+  `gcloud --remote-go-repo` flag maps to the same common repository URI. The
+  remote configuration's description is an optional instance-bound surface
+  (`remote_upstream.description`, null or non-empty, never a core-carried
+  text): the field forces replacement of the repository, so a repository born
+  before the declaration binds the absent form byte-exact to the live state,
+  and a repository born through the engine may carry the canonical text from
+  birth.
 - DOCKER workload image repositories always use standard mode and never bind
   a remote upstream: the workload classes (`staging-*`, `release-*`) are
   filled through the governed producer channel and promotion, never proxied.
