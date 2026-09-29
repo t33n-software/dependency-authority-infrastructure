@@ -38,7 +38,7 @@ diagnostic bindings of the forensics reader access class on the zone project.
 
 ## Inputs
 
-`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `organization_number` (the instance-bound numeric organization number carried by the zone's privileged-access platform setup), `location`, `ecosystems` (default `["go"]`), `pool_id`,
+`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `organization_number` (the instance-bound numeric organization number carried by the zone's privileged-access platform setup), `location`, `ecosystems` (default `["go"]`), `pool_id` (the pool's display name binds this identity class name, and the pool carries its canonical intent description as a stack-declared surface — the mandatory description duty of the mandatory resource properties convention),
 optional zone `identities`, `writer_members`, `reader_members`,
 `break_glass_recovery` (the approved recovery binding of the quarantine
 zone: the per-activation grant duration of the recovery entitlement and the
@@ -47,7 +47,8 @@ approver principal set of its approval workflow),
 `evidence_bucket_name`, `state_bucket_name` (the instance-bound zone state
 home bucket, provisioned by the converged foundation — never by this stack),
 `state_encryption_key` (the instance-bound engine key reference of this
-root's client-side state and plan encryption), audit sink settings and
+root's client-side state and plan encryption), audit sink settings (the sink
+carries its canonical intent description as a stack-declared surface) and
 `policy_constraints`.
 
 ## Outputs

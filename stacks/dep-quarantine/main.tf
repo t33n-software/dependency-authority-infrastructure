@@ -1,3 +1,12 @@
+locals {
+  # The canonical human-readable description surfaces of the zone identity and
+  # audit export boundaries (the mandatory description duty of the mandatory
+  # resource properties convention): the canonical intent texts of the zone
+  # workload identity pool and the zone audit sink.
+  workload_identity_pool_description = "Workload identity pool of the quarantine zone: federates exactly the lane trigger identities of the zone, never the execution identities."
+  audit_sink_description             = "Zone audit export: exports the zone project's Cloud Audit Logs into the evidence archive bucket of the evidence zone."
+}
+
 provider "google" {
   project = var.project_id
 }
@@ -43,6 +52,12 @@ module "workload_identity" {
   project_number = var.project_number
   pool_id        = var.pool_id
 
+  # The canonical human-readable surfaces of the zone pool (the mandatory
+  # description duty): the display name binds the pool's identity class name,
+  # the description the canonical intent text.
+  pool_display_name = var.pool_id
+  pool_description  = local.workload_identity_pool_description
+
   identities = var.identities
 }
 
@@ -64,7 +79,8 @@ module "audit_log_sink" {
 
   sinks = {
     (var.audit_sink_name) = {
-      filter = var.audit_log_filter
+      filter      = var.audit_log_filter
+      description = local.audit_sink_description
     }
   }
 }
