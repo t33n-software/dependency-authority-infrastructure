@@ -13,7 +13,7 @@ resource "google_artifact_registry_repository" "this" {
   dynamic "remote_repository_config" {
     for_each = var.remote_upstream == null ? [] : [var.remote_upstream]
     content {
-      description = remote_repository_config.value.common_uri != null ? "controlled common upstream" : "controlled public upstream"
+      description = remote_repository_config.value.description
 
       dynamic "npm_repository" {
         for_each = remote_repository_config.value.npm == null ? [] : [remote_repository_config.value.npm]

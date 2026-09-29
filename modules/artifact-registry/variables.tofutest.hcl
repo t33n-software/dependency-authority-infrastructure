@@ -123,3 +123,52 @@ run "rejects_an_unknown_cleanup_action" {
 
   expect_failures = [var.cleanup_policies]
 }
+
+# The behavioral proofs of the optional remote upstream description surface:
+# the field forces replacement of the repository, so the module never carries
+# the text itself — the set form binds the instance value, and the unset form
+# carries no description (the byte-exact binding of a repository born before
+# the declaration).
+
+run "binds_the_remote_description_when_set" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    format = "GO"
+    mode   = "REMOTE_REPOSITORY"
+    remote_upstream = {
+      common_uri  = "https://proxy.golang.org"
+      description = "Controlled common upstream of the test fixture."
+    }
+  }
+
+  assert {
+    condition     = google_artifact_registry_repository.this.remote_repository_config[0].description == "Controlled common upstream of the test fixture."
+    error_message = "The module must bind the optional remote upstream description when the instance sets it."
+  }
+}
+
+run "omits_the_remote_description_when_unset" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    format = "GO"
+    mode   = "REMOTE_REPOSITORY"
+    remote_upstream = {
+      common_uri = "https://proxy.golang.org"
+    }
+  }
+
+  assert {
+    condition     = google_artifact_registry_repository.this.remote_repository_config[0].description == null
+    error_message = "The module must carry no remote upstream description when the instance binds none — the absent form is the byte-exact binding of a repository born before the declaration."
+  }
+}
