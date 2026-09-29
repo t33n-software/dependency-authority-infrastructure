@@ -391,8 +391,15 @@ infrastructure core.
      binds the pool display and description surfaces, the audit sink
      description and the per-controller display name and description, and the
      intake stack binds the pool display and description surfaces, the audit
-     sink description and the fetcher display name and description —
-      required and validated fail-closed. The artifact-registry module's
+      sink description and the fetcher display name and description —
+      required and validated fail-closed. The quarantine stack binds the
+      pool display and description surfaces and the audit sink description
+      as the canonical stack-declared intent texts: the pool display name
+      binds the pool's identity class name, and the descriptions bind the
+      canonical intent forms of the zone identity and audit export
+      boundaries — the zone carries no workload network and no zone-local
+      lane identities, so the pool and sink surfaces are its complete
+      description duty. The artifact-registry module's
       remote configuration description is an optional instance-bound surface
       (null or non-empty), never a core-carried text: the field forces
       replacement of the repository, so a repository born before the

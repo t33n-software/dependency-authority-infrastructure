@@ -1585,11 +1585,18 @@ func TestStacksDeclareTheInvokeOnlyTriggerRights(t *testing.T) {
 	}
 
 	// Zone purity: the quarantine and approved zones never carry trigger
-	// identities.
+	// identities. The clause binds the declaration surfaces — the trigger
+	// identity fields, the job topology and the job trigger binding — never
+	// the bare text form, because the canonical intent text of the zone
+	// workload identity pool description states the boundary itself and names
+	// the lane trigger identities of the zone without declaring one (the
+	// zone pool exists; the zone-local lane identities do not).
 	for _, stack := range []string{"dep-approved", "dep-quarantine"} {
-		main := readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf"))
-		if strings.Contains(main, "trigger") {
-			t.Fatalf("stacks/%s must never declare trigger identities; the topology is zone-pure", stack)
+		main := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", stack, "main.tf")))
+		for _, declared := range []string{"trigger_", "invoker_member", "workload_jobs"} {
+			if strings.Contains(main, declared) {
+				t.Fatalf("stacks/%s carries the trigger identity declaration surface %q; the topology is zone-pure", stack, declared)
+			}
 		}
 	}
 
@@ -2764,6 +2771,56 @@ func TestIntakeStackBindsTheMandatoryDescriptionSurfaces(t *testing.T) {
 	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
 	if !strings.Contains(traceability, "DAI-39") {
 		t.Fatal("TRACEABILITY.md does not contain DAI-39")
+	}
+}
+
+func TestQuarantineStackBindsTheMandatoryDescriptionSurfaces(t *testing.T) {
+	// The mandatory description duty of the mandatory resource properties
+	// convention extends to the quarantine zone: the quarantine stack wires the
+	// canonical intent description surfaces of the zone workload identity pool
+	// and the zone audit sink — the pool display name binds the pool's identity
+	// class name, the pool and sink descriptions the canonical stack-declared
+	// intent texts. The module surfaces and their wirings stay bound by the
+	// control-zone guard; this guard binds the quarantine-stack binding.
+	quarantineMain := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-quarantine", "main.tf")))
+	for _, required := range []string{
+		`workload_identity_pool_description = "Workload identity pool of the quarantine zone: federates exactly the lane trigger identities of the zone, never the execution identities."`,
+		`audit_sink_description = "Zone audit export: exports the zone project's Cloud Audit Logs into the evidence archive bucket of the evidence zone."`,
+		`pool_display_name = var.pool_id`,
+		`pool_description = local.workload_identity_pool_description`,
+		`description = local.audit_sink_description`,
+	} {
+		if !strings.Contains(quarantineMain, required) {
+			t.Fatalf("stacks/dep-quarantine/main.tf does not wire the description surface %q", required)
+		}
+	}
+
+	// The pool and sink description surfaces carry no behavioral fixture run:
+	// the pinned engine's test assertions must reference a resource, data
+	// source, variable, output or module, and the surfaces are stack-declared
+	// locals (the control-zone form of DAI-27) — this guard proves the
+	// bindings fail-closed, and the stack's behavioral fixture keeps proving
+	// its validated surfaces in the governed execution window.
+	stackReadme := readRepositoryFile(t, filepath.Join("stacks", "dep-quarantine", "README.md"))
+	for _, required := range []string{"mandatory resource properties convention", "canonical intent description"} {
+		if !strings.Contains(stackReadme, required) {
+			t.Fatalf("the dep-quarantine stack README does not document %q of the mandatory description duty", required)
+		}
+	}
+
+	adr := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"quarantine stack binds the pool display and description surfaces",
+		"canonical stack-declared intent texts",
+	} {
+		if !strings.Contains(adr, required) {
+			t.Fatalf("ADR-0001 does not carry the quarantine description duty element %q", required)
+		}
+	}
+
+	traceability := readRepositoryFile(t, filepath.Join("docs", "TRACEABILITY.md"))
+	if !strings.Contains(traceability, "DAI-41") {
+		t.Fatal("TRACEABILITY.md does not contain DAI-41")
 	}
 }
 
