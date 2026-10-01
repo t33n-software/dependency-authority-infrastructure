@@ -72,7 +72,7 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/t33n-software/go-quality-authority v0.0.0-20260923180700-e24f6bb77ccd // indirect
 	github.com/t33n-software/license-hub v0.0.0-20260830165735-6f63ab95be35 // indirect
-	github.com/t33n-software/repository-governance v0.0.0-20260926171136-da3c59766ce2 // indirect
+	github.com/t33n-software/repository-governance v0.0.0-20260930203819-a58e2a56edd9 // indirect
 	github.com/tidwall/jsonc v0.3.3 // indirect
 	github.com/urfave/cli/v3 v3.10.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
