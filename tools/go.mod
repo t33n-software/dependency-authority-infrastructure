@@ -71,7 +71,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/schollz/progressbar/v3 v3.19.1 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
-	github.com/t33n-software/go-quality-authority v0.0.0-20260923180700-e24f6bb77ccd // indirect
+	github.com/t33n-software/go-quality-authority v1.1.0 // indirect
 	github.com/t33n-software/license-hub v0.0.0-20260830165735-6f63ab95be35 // indirect
 	github.com/t33n-software/repository-governance v1.2.0 // indirect
 	github.com/tidwall/jsonc v0.3.3 // indirect
