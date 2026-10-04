@@ -14,10 +14,12 @@
 # file, and every value assigned here is synthetic test data.
 
 variables {
-  project_id          = "test-dep-evidence"
-  project_number      = "100000000050"
-  organization_number = "900000000001"
-  location            = "europe-west1"
+  project_id            = "test-dep-evidence"
+  project_number        = "100000000050"
+  organization_number   = "900000000001"
+  folder_number         = "400000000001"
+  anchor_project_number = "100000000060"
+  location              = "europe-west1"
 
   workload_network = {
     network_name               = "dep-evidence-workload"
@@ -284,4 +286,81 @@ run "rejects_a_non_numeric_organization_number" {
   }
 
   expect_failures = [var.organization_number]
+}
+
+run "accepts_a_numeric_folder_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.folder_number == "400000000001"
+    error_message = "The validation must accept the numeric Google Cloud folder ID of the folder grouping layer."
+  }
+}
+
+run "rejects_a_non_numeric_folder_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    folder_number = "dependency-authority"
+  }
+
+  expect_failures = [var.folder_number]
+}
+
+run "accepts_a_numeric_anchor_project_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = var.anchor_project_number == "100000000060"
+    error_message = "The validation must accept the numeric Google Cloud project number of the organization anchor project."
+  }
+}
+
+run "rejects_a_non_numeric_anchor_project_number" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  variables {
+    anchor_project_number = "t33n-software-org-anchor"
+  }
+
+  expect_failures = [var.anchor_project_number]
+}
+
+run "accepts_the_audit_export_writer_grammar" {
+  command = plan
+
+  plan_options {
+    refresh = false
+  }
+
+  assert {
+    condition     = contains(module.evidence_archive.logging_export_writer_members, "serviceAccount:service-org-900000000001@gcp-sa-logging.iam.gserviceaccount.com")
+    error_message = "The archive must grant the standing append-focused write capability to the organization node's Cloud Logging service agent."
+  }
+
+  assert {
+    condition     = contains(module.evidence_archive.logging_export_writer_members, "serviceAccount:service-folder-400000000001@gcp-sa-logging.iam.gserviceaccount.com")
+    error_message = "The archive must grant the standing append-focused write capability to the folder grouping layer's Cloud Logging service agent."
+  }
+
+  assert {
+    condition     = contains(module.evidence_archive.logging_export_writer_members, "serviceAccount:service-100000000060@gcp-sa-logging.iam.gserviceaccount.com")
+    error_message = "The archive must grant the standing append-focused write capability to the organization anchor project's unique Cloud Logging writer identity."
+  }
 }

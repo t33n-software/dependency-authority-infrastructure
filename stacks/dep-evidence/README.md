@@ -67,6 +67,14 @@ diagnostic bindings of the forensics reader access class on the zone project.
   and justification-bound and time-boxed by the platform-enforced grant
   duration; the duration and the approver set are approved instance
   decisions, supplied through the `break_glass_recovery` input.
+- The audit export writers of the organization plane: the Cloud Logging
+  service agents of the logging root's anchor set (the organization node,
+  the folder grouping layer and the organization anchor project) hold the
+  standing append-focused write capability on the retention archive
+  (`roles/storage.objectCreator`, bucket-scoped, never read, never delete,
+  never a window grant) — the members are derived from the instance-bound
+  numbers through the doc-proven service agent grammar and exported by the
+  archive module for the window read-back cross-check.
 - The stack consumes the zone state home — the dedicated state bucket of the
   zone holding that zone's root states and nothing else — through the final
   `gcs` backend binding with the state-key grammar prefix identifying exactly
@@ -77,7 +85,7 @@ diagnostic bindings of the forensics reader access class on the zone project.
 
 ## Inputs
 
-`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `organization_number` (the instance-bound numeric organization number carried by the zone's privileged-access platform setup), `location`, `ecosystems` (default `["go"]`), `pool_id`,
+`project_id`, `project_number` (the instance-bound numeric project number bound by the zone workload identity pool — the pool's provider state carries the number, never the ID), `organization_number` (the instance-bound numeric organization number carried by the zone's privileged-access platform setup), `folder_number` and `anchor_project_number` (the instance-bound numeric folder ID of the dependency-authority folder grouping layer and the instance-bound numeric project number of the organization anchor project — both feed the deterministic service agent derivation of the organization-plane audit export writers on the retention archive), `location`, `ecosystems` (default `["go"]`), `pool_id`,
 `writer` and `auditor` (OIDC bindings), `workload_job_images` (the
 instance-bound image digests keyed by canonical job name),
 `enabled_workload_jobs` (the instance-bound activation set of the zone's

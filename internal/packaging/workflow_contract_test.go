@@ -1277,6 +1277,76 @@ func TestStacksDeclareTheCanonicalIAMTargetMatrix(t *testing.T) {
 		t.Fatal("stacks/dep-evidence/variables.tf still names the approved promoter as a canonical evidence reader; the promotion writes its approved record into the evidence repository through the writer grant")
 	}
 
+	// The organization-plane audit export writers hold the standing
+	// append-focused write capability on the retention archive: the third
+	// Evidence-Plane writer class, derived from the deterministic Cloud
+	// Logging service agents of the logging root's anchor set and never a
+	// window grant.
+	evidenceArchiveModule := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "evidence-archive", "main.tf")))
+	for _, required := range []string{
+		`resource "google_storage_bucket_iam_member" "logging_export_writer" {`,
+		`for_each = var.logging_export_writer_members`,
+		`bucket = google_storage_bucket.this.name`,
+		`role = "roles/storage.objectCreator"`,
+		`member = each.value`,
+	} {
+		if !strings.Contains(evidenceArchiveModule, required) {
+			t.Fatalf("modules/evidence-archive/main.tf does not bind the audit export writer form %q", required)
+		}
+	}
+	evidenceArchiveVariables := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "evidence-archive", "variables.tf")))
+	if !strings.Contains(evidenceArchiveVariables, `variable "logging_export_writer_members" {`) {
+		t.Fatal("modules/evidence-archive/variables.tf does not carry the logging_export_writer_members input")
+	}
+	evidenceArchiveOutputs := normalizeWhitespace(readRepositoryFile(t, filepath.Join("modules", "evidence-archive", "outputs.tf")))
+	if !strings.Contains(evidenceArchiveOutputs, `output "logging_export_writer_members" {`) {
+		t.Fatal("modules/evidence-archive/outputs.tf does not export the granted audit export writer set for the window read-back cross-check")
+	}
+	for _, required := range []string{
+		`logging_export_writer_members = local.audit_export_writer_members`,
+		`"serviceAccount:service-org-${var.organization_number}@gcp-sa-logging.iam.gserviceaccount.com"`,
+		`"serviceAccount:service-folder-${var.folder_number}@gcp-sa-logging.iam.gserviceaccount.com"`,
+		`"serviceAccount:service-${var.anchor_project_number}@gcp-sa-logging.iam.gserviceaccount.com"`,
+	} {
+		if !strings.Contains(evidenceMain, required) {
+			t.Fatalf("stacks/dep-evidence/main.tf does not bind the audit export writer derivation form %q", required)
+		}
+	}
+	for _, required := range []string{
+		`variable "folder_number" {`,
+		`variable "anchor_project_number" {`,
+	} {
+		if !strings.Contains(evidenceVariables, required) {
+			t.Fatalf("stacks/dep-evidence/variables.tf does not carry the audit export writer number input %q", required)
+		}
+	}
+	evidenceFixture := normalizeWhitespace(readRepositoryFile(t, filepath.Join("stacks", "dep-evidence", "variables.tofutest.hcl")))
+	for _, required := range []string{
+		`run "accepts_a_numeric_folder_number"`,
+		`run "rejects_a_non_numeric_folder_number"`,
+		`run "accepts_a_numeric_anchor_project_number"`,
+		`run "rejects_a_non_numeric_anchor_project_number"`,
+		`run "accepts_the_audit_export_writer_grammar"`,
+		`serviceAccount:service-org-900000000001@gcp-sa-logging.iam.gserviceaccount.com`,
+		`serviceAccount:service-folder-400000000001@gcp-sa-logging.iam.gserviceaccount.com`,
+		`serviceAccount:service-100000000060@gcp-sa-logging.iam.gserviceaccount.com`,
+	} {
+		if !strings.Contains(evidenceFixture, required) {
+			t.Fatalf("stacks/dep-evidence/variables.tofutest.hcl does not carry the audit export writer proof element %q", required)
+		}
+	}
+	adrAuditExport := normalizeWhitespace(readRepositoryFile(t, filepath.Join("docs", "architecture", "ADR-0001-DEPENDENCY-AUTHORITY-INFRASTRUCTURE.md")))
+	for _, required := range []string{
+		"standing audit export writer surface",
+		"third Evidence-Plane",
+		"roles/storage.objectCreator",
+		"gcp-sa-logging.iam.gserviceaccount.com",
+	} {
+		if !strings.Contains(adrAuditExport, required) {
+			t.Fatalf("ADR-0001 does not carry the audit export writer decision element %q", required)
+		}
+	}
+
 	// Approved: no zone-local workload identity; the promotion and revocation
 	// writes and the revalidation and consumer verification reads are
 	// control-zone members bound through the member inputs.

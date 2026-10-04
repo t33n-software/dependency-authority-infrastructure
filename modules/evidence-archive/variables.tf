@@ -45,3 +45,18 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "logging_export_writer_members" {
+  description = <<-EOT
+    Members carrying the standing append-focused write capability on the
+    retention archive: the Cloud Logging service agents of the
+    organization-plane audit export anchors (the organization node, the
+    folder grouping layer and the organization anchor project) that route
+    their audit trails into this immutable evidence boundary. The consuming
+    stack derives them from the instance-bound numbers through the
+    deterministic service agent grammar; this module binds them with the
+    fixed canonical destination role and never presets them.
+  EOT
+  type        = set(string)
+  default     = []
+}
