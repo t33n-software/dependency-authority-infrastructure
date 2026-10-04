@@ -16,6 +16,24 @@ locals {
   }
 }
 
+locals {
+  # The standing audit export writers of the organization plane: the
+  # deterministic Cloud Logging service agents of the logging root's anchor
+  # set (the organization node, the folder grouping layer and the
+  # organization anchor project), derived from the instance-bound numbers
+  # through the documentation-proven service agent grammar (the Cloud
+  # Logging export documentation carries the gcp-sa-logging domain and the
+  # per-resource shared service account model of projects, folders and
+  # organizations; the provisioning read-back of the anchor set proved the
+  # live identities). They append their routed audit trails into this zone's
+  # retention archive and never receive read or delete authority.
+  audit_export_writer_members = toset([
+    "serviceAccount:service-org-${var.organization_number}@gcp-sa-logging.iam.gserviceaccount.com",
+    "serviceAccount:service-folder-${var.folder_number}@gcp-sa-logging.iam.gserviceaccount.com",
+    "serviceAccount:service-${var.anchor_project_number}@gcp-sa-logging.iam.gserviceaccount.com",
+  ])
+}
+
 provider "google" {
   project = var.project_id
 }
@@ -80,6 +98,8 @@ module "evidence_archive" {
   retention_period_seconds = var.retention_period_seconds
   lock_retention_policy    = var.lock_retention_policy
   kms_key_name             = var.archive_kms_key_name
+
+  logging_export_writer_members = local.audit_export_writer_members
 
   labels = {
     boundary = "dependency-authority"

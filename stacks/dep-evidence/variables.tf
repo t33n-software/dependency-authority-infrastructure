@@ -23,6 +23,26 @@ variable "organization_number" {
   }
 }
 
+variable "folder_number" {
+  description = "Numeric folder ID of the dependency-authority folder grouping layer of the organization hierarchy: the folder-level audit export anchor's Cloud Logging service agent (service-folder-<number>@gcp-sa-logging.iam.gserviceaccount.com) is derived from it. Supplied by the organization instance; the core never presets it."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.folder_number))
+    error_message = "folder_number must be the numeric Google Cloud folder ID."
+  }
+}
+
+variable "anchor_project_number" {
+  description = "Numeric project number of the organization anchor project: the project-level audit export anchor's unique Cloud Logging writer identity (service-<number>@gcp-sa-logging.iam.gserviceaccount.com) is derived from it. Supplied by the organization instance; the core never presets it."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.anchor_project_number))
+    error_message = "anchor_project_number must be the numeric Google Cloud project number of the organization anchor project."
+  }
+}
+
 variable "location" {
   description = "Artifact Registry location of the evidence repositories, Cloud Storage location of the retention archive and the job region of the zone workload network."
   type        = string

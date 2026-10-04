@@ -474,6 +474,35 @@ infrastructure core.
      contract guard pins the assignment matrix fail-closed, per resource
      class and across every module.
 
+  19. The retention archive carries the standing audit export writer surface
+      of the organization plane: the Cloud Logging service agents of the
+      logging root's anchor set (the organization node, the folder grouping
+      layer and the organization anchor project) hold the append-focused
+      write capability on the archive bucket — the third Evidence-Plane
+      writer class beside the lane execution identities and the zone sink
+      writers, bound per the organization-plane audit export convention of
+      the cloud-agnostic dependency authority reference. The grant is a
+      standing declared surface, never a window grant: the anchors route
+      every privileged hierarchy level's audit trails into this immutable
+      evidence boundary, and an ungrantable archive would silently drop the
+      routed entries. The members are derived in the evidence stack from the
+      instance-bound numbers through the deterministic service agent grammar
+      proven against the Cloud Logging export documentation (the
+      `gcp-sa-logging.iam.gserviceaccount.com` domain, the
+      `serviceAccount:service-<number>@` project form and the per-resource
+      shared service account model of projects, folders and organizations)
+      and cross-bound against the provisioning read-back of the anchor set;
+      the role is the canonical, documentation-proven destination role for
+      Cloud Storage log sink destinations (`roles/storage.objectCreator`),
+      bound as a fixed resource literal in the evidence-archive module —
+      append-focused, never read, never delete, never a configurable wider
+      role. The grant is bucket-scoped through the module (uniform
+      bucket-level access is the archive's access mechanism), the module
+      exports the granted member set for the window read-back cross-check,
+      and the behavioral proofs live beside the stack: the acceptance and
+      rejection runs of both numeric gates and the member grammar acceptance
+      run through the module output.
+
 ## Consequences
 
 - Every module, policy binding and stack change is a governed, reviewable
